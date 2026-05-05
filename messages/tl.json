@@ -326,7 +326,7 @@
     "saveSuccess": "Naisave ang work record.",
     "saveFailed": "Nabigong i-save ang work record.",
     "uploadTooLargeHint": "Lampas sa hosting na ~4.5MB ang request body. Auto-compress ang larawan; bawasan ang bilang o mas maikling video.",
-    "storageMaxSizeMisconfiguredHint": "Tinanggihan ng Storage kahit maliit ang file—karaniwang maling Storage bucket o project file-size limit sa Supabase, hindi laki ng larawan. Sa Dashboard → Storage, itaas ang limit para sa bucket maintenance-work-media (o project limits). Detalye:",
+    "storageMaxSizeMisconfiguredHint": "Maliit ang file pero tinanggihan—una itaas ang global Storage max file size sa Supabase project, saka ang bucket maintenance-work-media (hindi pwedeng lampas ang bucket sa global). Hindi ito tungkol sa laki ng larawan. Detalye:",
     "videoTooLargeForUpload": "Ang mga video ay dapat ~3.5MB o mas maliit dahil sa cloud upload limits. Gumamit ng mas maikling clip o maglarawan na lang.",
     "demoSaveSuccess": "Naisave locally ang demo record.",
     "demoCompleted": "Nakumpleto ang demo workflow.",

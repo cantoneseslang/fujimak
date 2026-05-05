@@ -326,7 +326,7 @@
     "saveSuccess": "作業記錄已儲存。",
     "saveFailed": "儲存作業記錄失敗。",
     "uploadTooLargeHint": "送出資料超過主機上限（約4.5MB）。照片會自動壓縮；請減少數量或縮短影片。",
-    "storageMaxSizeMisconfiguredHint": "檔案很小卻被 Storage 拒絕，多半是 Supabase 儲存桶或專案的上傳上限設定問題，而非照片本身。請至 Dashboard → Storage 檢查 maintenance-work-media 桶（或專案上限）並調高。詳細:",
+    "storageMaxSizeMisconfiguredHint": "檔案很小卻被拒絕時，請先在 Supabase 專案的 Storage「全域」檔案上限調高，再檢查 maintenance-work-media 桶（桶上限不得高於全域）。與照片檔案大小無關。詳細:",
     "videoTooLargeForUpload": "影片需約3.5MB以下（雲端上傳上限）。請縮短片段或改以照片記錄。",
     "demoSaveSuccess": "示範記錄已在本機儲存。",
     "demoCompleted": "示範流程已完成。",

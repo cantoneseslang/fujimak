@@ -25,7 +25,6 @@ const WORK_MEDIA_BUCKET_FILE_SIZE_LIMIT =
   (typeof process.env.FUJIMAK_WORK_MEDIA_BUCKET_SIZE_LIMIT === 'string' &&
     process.env.FUJIMAK_WORK_MEDIA_BUCKET_SIZE_LIMIT.trim()) ||
   '200MB'
-const WORK_MEDIA_ALLOWED_MIME_TYPES = ['image/*', 'video/*']
 const WORK_MEDIA_MAX_FILE_BYTES =
   Math.max(
     10,
@@ -72,6 +71,21 @@ function pickExt(mimeType: string) {
   return raw.split(';')[0]?.replace(/[^a-zA-Z0-9]/g, '') || 'bin'
 }
 
+/** OS / ブラウザによっては File.type が空になる（その場合 MIME 検証でドロップされていたり Storage が変な判定をすることがある） */
+function inferImageVideoMimeFromFilename(filename: string): string {
+  const lower = filename.toLowerCase()
+  if (/\.jpe?g$/i.test(lower)) return 'image/jpeg'
+  if (/\.png$/i.test(lower)) return 'image/png'
+  if (/\.webp$/i.test(lower)) return 'image/webp'
+  if (/\.gif$/i.test(lower)) return 'image/gif'
+  if (/\.heic$/i.test(lower)) return 'image/heic'
+  if (/\.heif$/i.test(lower)) return 'image/heif'
+  if (/\.mp4$/i.test(lower)) return 'video/mp4'
+  if (/\.webm$/i.test(lower)) return 'video/webm'
+  if (/\.mov$/i.test(lower)) return 'video/quicktime'
+  return ''
+}
+
 function parseMediaList(value: unknown): IncomingMedia[] {
   if (!Array.isArray(value)) return []
   const parsed: IncomingMedia[] = []
@@ -108,7 +122,10 @@ async function parseMediaListFromFormData(
   for (let i = 0; i < values.length; i += 1) {
     const value = values[i]
     if (!(value instanceof File)) continue
-    const mimeType = asText(value.type)
+    let mimeType = asText(value.type)
+    if (!MEDIA_MIME_RE.test(mimeType)) {
+      mimeType = inferImageVideoMimeFromFilename(asText(value.name))
+    }
     if (!MEDIA_MIME_RE.test(mimeType)) continue
     let bytes: Buffer
     try {
@@ -169,7 +186,8 @@ async function ensureWorkMediaBucket(supabase: ReturnType<typeof getSupabaseAdmi
     const { error: createError } = await supabase.storage.createBucket(bucketName, {
       public: true,
       fileSizeLimit: limitBytes,
-      allowedMimeTypes: WORK_MEDIA_ALLOWED_MIME_TYPES,
+      /** null = すべての MIME を許可（image/* ワイルドカードが環境によって Strict に効きすぎる事例を避ける） */
+      allowedMimeTypes: null,
     })
     if (createError) throw createError
   } else if (bucketError) {
@@ -179,9 +197,11 @@ async function ensureWorkMediaBucket(supabase: ReturnType<typeof getSupabaseAdmi
   const { error: updateError } = await supabase.storage.updateBucket(bucketName, {
     public: true,
     fileSizeLimit: limitBytes,
-    allowedMimeTypes: WORK_MEDIA_ALLOWED_MIME_TYPES,
+    allowedMimeTypes: null,
   })
-  if (updateError) throw updateError
+  if (updateError) {
+    console.error('[mechanic/work-record] storage.updateBucket failed (upload still attempted):', updateError.message)
+  }
 
   return bucketName
 }
@@ -212,7 +232,7 @@ async function persistMedia(params: {
       }
 
       const ext = pickExt(item.mimeType)
-      const objectPath = `${requestId}/${phase}/${Date.now()}_${i}.${ext}`
+      const objectPath = `${requestId}/${phase}/${Date.now()}_${i}_${Math.random().toString(36).slice(2, 10)}.${ext}`
       const { error: uploadError } = await supabase.storage.from(bucketName).upload(objectPath, bytes, {
         contentType: item.mimeType,
         upsert: false,
@@ -245,7 +265,7 @@ async function persistMedia(params: {
       error: [
         `Could not save any ${phase} media to Storage bucket "${bucketName}".`,
         failures.length > 0 ? failures.join(' · ') : 'No detailed errors (check bucket policies and Storage limits in Supabase).',
-        'Note: Supabase may report "maximum allowed size" even when your file is small if the bucket/global Storage limit is misconfigured.',
+        'Supabase: raise BOTH project-wide Storage file limit AND bucket maintenance-work-media limit (Dashboard → Storage → Settings). Bucket limit cannot exceed the global limit.',
       ].join(' '),
     }
   }
@@ -386,7 +406,13 @@ export async function POST(request: NextRequest) {
       .eq('id', requestId)
       .select('*')
       .single()
-    if (error) throw error
+    if (error || !data) {
+      console.error('[mechanic/work-record] maintenance_requests update failed:', error)
+      return NextResponse.json(
+        { error: error?.message ? `Database update failed: ${error.message}` : 'Database update failed' },
+        { status: 422 }
+      )
+    }
 
     if (nextStatus !== currentStatus) {
       const updateNote =
@@ -395,13 +421,16 @@ export async function POST(request: NextRequest) {
           : markCompleted || recordType === 'complete'
             ? 'Recorded mechanic work completion evidence'
             : 'Recorded mechanic work evidence'
-      await supabase.from('maintenance_updates').insert({
+      const { error: histErr } = await supabase.from('maintenance_updates').insert({
         request_id: requestId,
         from_status: currentStatus || null,
         to_status: nextStatus,
         note: updateNote,
         actor: 'mechanic_portal',
       })
+      if (histErr) {
+        console.error('[mechanic/work-record] maintenance_updates insert failed:', histErr.message)
+      }
     }
 
     return NextResponse.json({

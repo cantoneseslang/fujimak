@@ -326,7 +326,7 @@
     "saveSuccess": "Work record saved.",
     "saveFailed": "Failed to save work record.",
     "uploadTooLargeHint": "The HTTP request body is too large for the hosting limit (about 4.5MB). Photos are compressed automatically; attach fewer items or use a shorter/smaller video.",
-    "storageMaxSizeMisconfiguredHint": "Cloud Storage rejected the upload even though the files look small. This usually means the Supabase Storage bucket or project file-size limit is misconfigured—not your photo size. In Supabase Dashboard → Storage, open bucket maintenance-work-media (or project Storage limits) and raise the max upload size. Details:",
+    "storageMaxSizeMisconfiguredHint": "Cloud Storage rejected the upload even though the files look small. In Supabase Dashboard: first raise the project-wide Storage max file size (Storage settings / global limit), then open bucket maintenance-work-media—the bucket limit cannot exceed the global limit. This message is not about your photo bytes. Details:",
     "videoTooLargeForUpload": "Videos must be about 3.5MB or smaller due to cloud upload limits. Use a shorter clip or capture photos instead.",
     "demoSaveSuccess": "Demo record saved locally.",
     "demoCompleted": "Demo workflow completed.",

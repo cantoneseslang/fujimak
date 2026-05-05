@@ -326,7 +326,7 @@
     "saveSuccess": "作業記録を保存しました。",
     "saveFailed": "作業記録の保存に失敗しました。",
     "uploadTooLargeHint": "サーバーへの送信サイズ（おおよそ4.5MB以下）を超えています。写真は自動で圧縮しています。枚数を減らすか、動画を短くしてください。",
-    "storageMaxSizeMisconfiguredHint": "ファイルが小さいのに Storage が拒否している状態です。写真容量ではなく Supabase のバケットまたはプロジェクト側の「アップロード上限」の設定不備であることが多いです。Dashboard → Storage でバケット maintenance-work-media（またはプロジェクトの上限）を確認し、上限を引き上げてください。詳細:",
+    "storageMaxSizeMisconfiguredHint": "ファイルが小さいのに Storage が拒否している状態です。Supabase Dashboard でまずプロジェクト全体の Storage のファイルサイズ上限を引き上げ、そのうえでバケット maintenance-work-media の上限を確認してください（バケット上限はグローバル上限を超えられません）。写真の容量とは別問題です。詳細:",
     "videoTooLargeForUpload": "動画は約3.5MB以下にしてください（クラウドのアップロード上限のため）。短いクリップにするか、写真での記録に切り替えてください。",
     "demoSaveSuccess": "デモ記録をローカルに保存しました。",
     "demoCompleted": "デモフローが完了しました。",

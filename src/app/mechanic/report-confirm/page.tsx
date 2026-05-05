@@ -841,7 +841,7 @@ export default function MechanicReportConfirmPage() {
                     ).map(([label, value]) => (
                       <div key={label} className="border-b border-zinc-200/80 pb-1.5">
                         <dt className="font-medium text-zinc-600">{label}</dt>
-                        <dd className="mt-0.5 text-zinc-800">{asText(value) || '—'}</dd>
+                        <dd className="mt-0.5 text-zinc-800">{asText(value) || '-'}</dd>
                       </div>
                     ))}
                   </dl>

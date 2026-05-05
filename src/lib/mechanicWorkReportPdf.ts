@@ -203,7 +203,7 @@ export async function buildMechanicWorkReportPdf(params: {
     ]
 
     const measureStackedCell = (label: string, rawValue: string, cellW: number) => {
-      const valueDisp = asText(rawValue) || '—'
+      const valueDisp = asText(rawValue) || '-'
       doc.font('Helvetica').fontSize(7).fillColor('#64748b')
       const labelH = doc.heightOfString(`${label}:`, { width: cellW })
       doc.font('Helvetica').fontSize(8.5).fillColor('#111111')

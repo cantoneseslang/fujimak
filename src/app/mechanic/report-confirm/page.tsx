@@ -103,6 +103,37 @@ function getLatestComment(remarks: string | null) {
   return latest ? latest.trim() : ''
 }
 
+/** Preview only: PDF はサーバー側 fetch で404になると空になります。ブラウザキャッシュで残って見えることがあるため onError で明示します。 */
+function EvidenceAttachmentImg(props: { url: string; name: string }) {
+  const { url, name } = props
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    setFailed(false)
+  }, [url])
+
+  if (failed) {
+    return (
+      <span className="text-center text-xs leading-snug text-amber-700">
+        画像を取得できません
+        <span className="mt-1 block text-[11px] font-normal text-zinc-500">
+          DB の attachments に残った URL を参照しています。Storage のファイルを消した場合は DB も更新してください。
+        </span>
+      </span>
+    )
+  }
+
+  return (
+    /* eslint-disable-next-line @next/next/no-img-element -- attachment preview URL */
+    <img
+      src={url}
+      alt={name}
+      className="max-h-[min(42vh,280px)] w-full object-contain"
+      onError={() => setFailed(true)}
+    />
+  )
+}
+
 function buildDemoRecord(draft: DemoReportDraft): MaintenanceRequestRecord {
   const nowIso = new Date().toISOString()
   const today = nowIso.slice(0, 10)
@@ -946,12 +977,7 @@ export default function MechanicReportConfirmPage() {
                             <p className="mb-1 text-xs font-semibold text-zinc-600">Before</p>
                             <div className="flex min-h-[120px] items-center justify-center rounded border border-zinc-200 bg-zinc-50 p-1">
                               {beforeImages[0] ? (
-                                /* eslint-disable-next-line @next/next/no-img-element -- attachment preview URL */
-                                <img
-                                  src={beforeImages[0].url}
-                                  alt={beforeImages[0].name}
-                                  className="max-h-[min(42vh,280px)] w-full object-contain"
-                                />
+                                <EvidenceAttachmentImg url={beforeImages[0].url} name={beforeImages[0].name} />
                               ) : (
                                 <span className="text-xs text-zinc-400">—</span>
                               )}
@@ -961,12 +987,7 @@ export default function MechanicReportConfirmPage() {
                             <p className="mb-1 text-xs font-semibold text-zinc-600">After</p>
                             <div className="flex min-h-[120px] items-center justify-center rounded border border-zinc-200 bg-zinc-50 p-1">
                               {afterImages[0] ? (
-                                /* eslint-disable-next-line @next/next/no-img-element -- attachment preview URL */
-                                <img
-                                  src={afterImages[0].url}
-                                  alt={afterImages[0].name}
-                                  className="max-h-[min(42vh,280px)] w-full object-contain"
-                                />
+                                <EvidenceAttachmentImg url={afterImages[0].url} name={afterImages[0].name} />
                               ) : (
                                 <span className="text-xs text-zinc-400">—</span>
                               )}

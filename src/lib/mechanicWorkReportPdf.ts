@@ -202,54 +202,37 @@ export async function buildMechanicWorkReportPdf(params: {
   }
 
   const drawChecklist = () => {
-    ensureSpace(162)
+    ensureSpace(48)
     doc.font('Helvetica-Bold').fontSize(10).text('Technical checklist comments')
-    doc.moveDown(0.35)
-    doc.font('Helvetica').fontSize(7.8)
+    doc.moveDown(0.28)
+    doc.font('Helvetica').fontSize(7.5)
     for (let i = 0; i < MAINTENANCE_CHECKLIST_LABELS.length; i++) {
       const label = MAINTENANCE_CHECKLIST_LABELS[i]
       const comment = form.checklistComments[i] || 'NA'
-      ensureSpace(14)
+      ensureSpace(11)
       doc.text(`${i + 1}. ${label}`, marginLeft, doc.y, { continued: true })
       doc.font('Helvetica-Bold').text(` — `, { continued: true })
       doc.font('Helvetica').text(comment)
     }
-    doc.moveDown(0.45)
+    doc.moveDown(0.35)
   }
 
   const drawRankConditions = () => {
-    ensureSpace(92)
+    ensureSpace(28)
     doc.font('Helvetica-Bold').fontSize(9).text('Ranking')
-    doc.moveDown(0.25)
-    doc.font('Helvetica').fontSize(7.2).fillColor('#374151')
-    doc.text(rankLabel(form.rank), marginLeft, doc.y, { width: contentW })
-    doc.moveDown(0.12)
-    doc.text(
-      'Rank reference: A Unit Operational · B Replacement part(s) · C Observation · D Pull out-shop evaluation · E Unit replacement',
-      marginLeft,
-      doc.y,
-      { width: contentW }
-    )
-    doc.moveDown(0.12)
-    doc.text(
-      'Conditions legend: O Perfect | Δ Not good (parts needed) | × DANGEROUS — stop using',
-      marginLeft,
-      doc.y,
-      { width: contentW }
-    )
+    doc.moveDown(0.22)
+    doc.font('Helvetica').fontSize(8).fillColor('#111111')
+    doc.text(`Rank: ${form.rank} — ${rankLabel(form.rank)}`, marginLeft, doc.y, { width: contentW })
+    doc.moveDown(0.15)
+    const conditionLine =
+      form.conditionLevel === 'dangerous'
+        ? 'Condition: × DANGEROUS — stop using'
+        : form.conditionLevel === 'not_good'
+          ? 'Condition: Δ Not good (parts needed)'
+          : 'Condition: O Perfect'
+    doc.text(conditionLine, marginLeft, doc.y, { width: contentW })
     doc.fillColor('#111111')
     doc.moveDown(0.35)
-
-    const boxTop = doc.y
-    doc.rect(marginLeft, boxTop, 52, 44).strokeColor('#d4d4d8').lineWidth(0.85).stroke()
-    doc.font('Helvetica-Bold').fontSize(8).text('Rank', marginLeft + 6, boxTop + 5)
-    doc.font('Helvetica-Bold').fontSize(18).text(form.rank, marginLeft + 6, boxTop + 18, { width: 40, align: 'center' })
-
-    const sym = form.conditionLevel === 'dangerous' ? '×' : form.conditionLevel === 'not_good' ? 'Δ' : 'O'
-    doc.font('Helvetica-Bold').fontSize(11).text(`Condition: ${sym}`, marginLeft + 62, boxTop + 14)
-
-    doc.y = boxTop + 50
-    doc.moveDown(0.2)
   }
 
   const drawPhotoStrip = async (label: string, images: ReportAttachment[], thumbW: number, thumbH: number) => {
@@ -335,12 +318,9 @@ export async function buildMechanicWorkReportPdf(params: {
   doc.y = pageTop
   drawHeaderBand()
 
-  doc.font('Helvetica-Bold').fontSize(9).text(`Request ID: ${request.id}`)
-  doc.fillColor('#111111')
-  doc.moveDown(0.45)
-
-  // 1. Client / dates / equipment (header body)
+  // 1. Same field order as report-confirm preview (“More header fields” grid)
   drawLabelValueRows([
+    ['Request ID', request.id],
     ['Client', form.clientLabel],
     ['PIC', form.picName],
     ['Location', form.locationText],
@@ -349,6 +329,9 @@ export async function buildMechanicWorkReportPdf(params: {
     ['Serial', form.serialNumber],
     ['Start Time', form.startTimeDisplay],
     ['Finish Time', form.finishTimeDisplay],
+    ['Form code', asText(form.formCode) || 'FPC011'],
+    ['Operation date (printed)', form.operationDateText],
+    ['Symptom', asText(request.symptom) || '—'],
   ])
 
   // 2. FOR — show selected classification only (Warranty XOR Billing)
@@ -372,10 +355,10 @@ export async function buildMechanicWorkReportPdf(params: {
   drawRankConditions()
 
   const thumbW = (contentW - 16) / 2
-  const thumbH = 72
-  await drawPhotoStrip('Overview', overviewImages, thumbW, thumbH)
+  const thumbH = 64
   await drawPhotoStrip('Before', beforeImages.slice(0, 2), thumbW, thumbH)
   await drawPhotoStrip('After', afterImages.slice(0, 2), thumbW, thumbH)
+  await drawPhotoStrip('Overview', overviewImages, thumbW, thumbH)
 
   drawInvoiceBlock()
 
@@ -421,27 +404,6 @@ export async function buildMechanicWorkReportPdf(params: {
     doc.fillColor('#111111')
   }
   doc.y = cy + 70
-
-  doc.addPage()
-  doc.x = marginLeft
-  doc.y = pageTop
-  doc.font('Helvetica-Bold').fontSize(12).text('Remarks (continuation)')
-  doc.moveDown(0.45)
-  doc.font('Helvetica').fontSize(8).fillColor('#52525b').text(
-    'Additional handwritten notes on printed copies. Remark fields for office use.'
-  )
-  doc.fillColor('#111111')
-  doc.moveDown(0.45)
-
-  const remarkBoxH = 52
-  const gap = 10
-  for (let i = 1; i <= 10; i++) {
-    ensureSpace(remarkBoxH + gap + 22)
-    doc.font('Helvetica-Bold').fontSize(9).text(`Remarks${i}`)
-    const ry = doc.y + 2
-    doc.rect(marginLeft, ry, contentW, remarkBoxH).strokeColor('#e4e4e7').lineWidth(0.75).stroke()
-    doc.y = ry + remarkBoxH + gap
-  }
 
   const range = doc.bufferedPageRange()
   const total = range.count

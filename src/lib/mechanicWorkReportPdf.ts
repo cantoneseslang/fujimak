@@ -398,24 +398,45 @@ export async function buildMechanicWorkReportPdf(params: {
   }
 
   const drawRankConditions = () => {
-    ensureSpace(28)
-    doc.x = marginLeft
-    doc.font('Helvetica-Bold').fontSize(9).fillColor('#111111')
-    doc.text('Ranking', marginLeft, doc.y, { width: contentW, align: 'left' })
-    doc.moveDown(0.22)
-    doc.font('Helvetica').fontSize(8).fillColor('#111111')
-    doc.text(`Rank: ${form.rank} — ${rankLabel(form.rank)}`, marginLeft, doc.y, { width: contentW })
-    doc.moveDown(0.15)
-    const conditionLine =
+    const colGap = 14
+    const halfW = (contentW - colGap) / 2
+    const rankLine = `Rank: ${form.rank} — ${rankLabel(form.rank)}`
+    const conditionVal =
       form.conditionLevel === 'dangerous'
-        ? 'Condition: × DANGEROUS — stop using'
+        ? '× DANGEROUS — stop using'
         : form.conditionLevel === 'not_good'
-          ? 'Condition: Δ Not good (parts needed)'
-          : 'Condition: O Perfect'
-    doc.text(conditionLine, marginLeft, doc.y, { width: contentW })
+          ? 'Δ Not good (parts needed)'
+          : 'O Perfect'
+
+    doc.font('Helvetica-Bold').fontSize(9).fillColor('#111111')
+    const titleLH = doc.heightOfString('Ranking', { width: halfW })
+    const titleRH = doc.heightOfString('Condition', { width: halfW })
+    doc.font('Helvetica').fontSize(8).fillColor('#111111')
+    const rankLH = doc.heightOfString(rankLine, { width: halfW })
+    const condRH = doc.heightOfString(conditionVal, { width: halfW })
+
+    const leftH = titleLH + 4 + rankLH
+    const rightH = titleRH + 4 + condRH
+    const rowH = Math.max(leftH, rightH) + 8
+
+    ensureSpace(rowH + 14)
+    const rowTop = doc.y
+
+    doc.font('Helvetica-Bold').fontSize(9).fillColor('#111111')
+    doc.text('Ranking', marginLeft, rowTop, { width: halfW })
+    doc.font('Helvetica').fontSize(8).fillColor('#111111')
+    doc.text(rankLine, marginLeft, rowTop + titleLH + 4, { width: halfW })
+
+    const rx = marginLeft + halfW + colGap
+    doc.font('Helvetica-Bold').fontSize(9).fillColor('#111111')
+    doc.text('Condition', rx, rowTop, { width: halfW })
+    doc.font('Helvetica').fontSize(8).fillColor('#111111')
+    doc.text(conditionVal, rx, rowTop + titleRH + 4, { width: halfW })
+
     doc.fillColor('#111111')
-    doc.moveDown(0.35)
+    doc.y = rowTop + rowH
     doc.x = marginLeft
+    doc.moveDown(0.2)
   }
 
   const drawPhotoStrip = async (label: string, images: ReportAttachment[], thumbW: number, thumbH: number) => {

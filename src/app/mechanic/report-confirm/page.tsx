@@ -901,20 +901,24 @@ export default function MechanicReportConfirmPage() {
                 </div>
 
                 <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
-                  <p className="mb-2 font-semibold text-zinc-900">Ranking</p>
-                  <div className="space-y-2 text-xs text-zinc-800">
-                    <p>
-                      <span className="font-semibold text-zinc-700">Rank: </span>
-                      {reportForm.rank} — {rankLabel(reportForm.rank)}
-                    </p>
-                    <p>
-                      <span className="font-semibold text-zinc-700">Condition: </span>
-                      {reportForm.conditionLevel === 'dangerous'
-                        ? '× DANGEROUS — stop using'
-                        : reportForm.conditionLevel === 'not_good'
-                          ? 'Δ Not good (parts needed)'
-                          : 'O Perfect'}
-                    </p>
+                  <div className="grid gap-4 text-xs text-zinc-800 sm:grid-cols-2">
+                    <div>
+                      <p className="font-semibold text-zinc-900">Ranking</p>
+                      <p className="mt-1">
+                        <span className="font-semibold text-zinc-700">Rank: </span>
+                        {reportForm.rank} — {rankLabel(reportForm.rank)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-zinc-900">Condition</p>
+                      <p className="mt-1 text-zinc-800">
+                        {reportForm.conditionLevel === 'dangerous'
+                          ? '× DANGEROUS — stop using'
+                          : reportForm.conditionLevel === 'not_good'
+                            ? 'Δ Not good (parts needed)'
+                            : 'O Perfect'}
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>

@@ -237,19 +237,50 @@ export async function buildMechanicWorkReportPdf(params: {
     doc.moveDown(0.25)
   }
 
-  const drawBoxParagraph = (heading: string, body: string, minHeight = 52) => {
-    ensureSpace(minHeight + 26)
-    doc.font('Helvetica-Bold').fontSize(9).text(heading)
+  /** Bordered body; empty or "-" → inner height fixed to two lines at body font size. */
+  const drawBoxParagraph = (heading: string, body: string, maxInnerWhenFilled = 40) => {
+    const padX = 6
+    const padY = 6
+    const innerW = contentW - padX * 2
+    const raw = asText(body)
+    const isPlaceholder = raw === '' || raw === '-'
+    const displayBody = raw === '' ? '-' : raw
+
+    doc.font('Helvetica').fontSize(8.5)
+    const lineH = doc.currentLineHeight(true)
+    const twoLineInner = lineH * 2
+
+    let innerContentH: number
+    let clipInnerH: number | undefined
+    if (isPlaceholder) {
+      innerContentH = twoLineInner
+    } else {
+      const measured = doc.heightOfString(displayBody, { width: innerW })
+      const maxInner = Math.max(maxInnerWhenFilled, twoLineInner)
+      if (measured <= maxInner) {
+        innerContentH = Math.max(measured, twoLineInner)
+      } else {
+        innerContentH = maxInner
+        clipInnerH = maxInner
+      }
+    }
+
+    const boxH = innerContentH + padY * 2
+    ensureSpace(boxH + 28)
+
+    doc.x = marginLeft
+    doc.font('Helvetica-Bold').fontSize(9).fillColor('#111111')
+    doc.text(heading, marginLeft, doc.y, { width: contentW, align: 'left' })
+
     const top = doc.y + 2
-    doc.rect(marginLeft, top, contentW, minHeight).strokeColor('#d4d4d8').lineWidth(0.8).stroke()
+    doc.rect(marginLeft, top, contentW, boxH).strokeColor('#d4d4d8').lineWidth(0.8).stroke()
     doc.font('Helvetica').fontSize(8.5).fillColor('#111827')
-    doc.text(body || '-', marginLeft + 6, top + 6, {
-      width: contentW - 12,
-      height: minHeight - 12,
-      ellipsis: true,
+    doc.text(displayBody, marginLeft + padX, top + padY, {
+      width: innerW,
+      ...(clipInnerH !== undefined ? { height: clipInnerH, ellipsis: true } : {}),
     })
     doc.fillColor('#111111')
-    doc.y = top + minHeight + 8
+    doc.y = top + boxH + 8
   }
 
   const drawChecklist = () => {
@@ -395,10 +426,10 @@ export async function buildMechanicWorkReportPdf(params: {
     drawLabelValueRows([['If For Billing (note)', form.billingNote || '—']])
   }
 
-  drawBoxParagraph('Concern', form.concern, 44)
-  drawBoxParagraph('Action Taken', form.actionTaken, 52)
+  drawBoxParagraph('Concern', form.concern, 44 - 12)
+  drawBoxParagraph('Action Taken', form.actionTaken, 52 - 12)
   drawLabelValueRows([['Finish (Status F)', form.statusF]])
-  drawBoxParagraph('Recommendation', form.recommendation, 40)
+  drawBoxParagraph('Recommendation', form.recommendation, 40 - 12)
 
   // 3. Technical checklist — 4. Ranking
   drawChecklist()

@@ -183,6 +183,60 @@ export async function buildMechanicWorkReportPdf(params: {
     doc.moveDown(0.2)
   }
 
+  /** Matches report-confirm preview: two columns × six rows, label above value. */
+  const drawHeaderTwoColumnGrid = () => {
+    const colGap = 16
+    const halfW = (contentW - colGap) / 2
+    const pairs: Array<[[string, string], [string, string]]> = [
+      [['Request ID', request.id], ['Client', form.clientLabel]],
+      [['PIC', form.picName], ['Location', form.locationText]],
+      [['Machine', form.equipmentLabel], ['Model', form.brand]],
+      [['Serial', form.serialNumber], ['Start Time', form.startTimeDisplay]],
+      [['Finish Time', form.finishTimeDisplay], ['Form code', asText(form.formCode) || 'FPC011']],
+      [['Operation date (printed)', form.operationDateText], ['Symptom', asText(request.symptom) || '—']],
+    ]
+
+    const measureStackedCell = (label: string, rawValue: string, cellW: number) => {
+      const valueDisp = asText(rawValue) || '—'
+      doc.font('Helvetica').fontSize(7).fillColor('#64748b')
+      const labelH = doc.heightOfString(`${label}:`, { width: cellW })
+      doc.font('Helvetica').fontSize(8.5).fillColor('#111111')
+      const valH = doc.heightOfString(valueDisp, { width: cellW })
+      return { labelH, valH, valueDisp }
+    }
+
+    for (const [left, right] of pairs) {
+      const [ll, lv] = left
+      const [rl, rv] = right
+      const L = measureStackedCell(ll, lv, halfW)
+      const R = measureStackedCell(rl, rv, halfW)
+      const leftH = L.labelH + 2 + L.valH
+      const rightH = R.labelH + 2 + R.valH
+      const rowH = Math.max(leftH, rightH) + 10
+
+      ensureSpace(rowH + 6)
+      const rowTop = doc.y
+      const rx = marginLeft + halfW + colGap
+
+      doc.font('Helvetica').fontSize(7).fillColor('#64748b')
+      doc.text(`${ll}:`, marginLeft, rowTop, { width: halfW })
+      doc.font('Helvetica').fontSize(8.5).fillColor('#111111')
+      doc.text(L.valueDisp, marginLeft, rowTop + L.labelH + 2, { width: halfW })
+
+      doc.font('Helvetica').fontSize(7).fillColor('#64748b')
+      doc.text(`${rl}:`, rx, rowTop, { width: halfW })
+      doc.font('Helvetica').fontSize(8.5).fillColor('#111111')
+      doc.text(R.valueDisp, rx, rowTop + R.labelH + 2, { width: halfW })
+
+      const lineY = rowTop + rowH - 4
+      doc.moveTo(marginLeft, lineY).lineTo(marginRight, lineY).strokeColor('#e5e7eb').lineWidth(0.55).stroke()
+
+      doc.y = rowTop + rowH
+      doc.fillColor('#111111')
+    }
+    doc.moveDown(0.25)
+  }
+
   const drawBoxParagraph = (heading: string, body: string, minHeight = 52) => {
     ensureSpace(minHeight + 26)
     doc.font('Helvetica-Bold').fontSize(9).text(heading)
@@ -311,21 +365,8 @@ export async function buildMechanicWorkReportPdf(params: {
   doc.y = pageTop
   drawHeaderBand()
 
-  // 1. Same field order as report-confirm preview (“More header fields” grid)
-  drawLabelValueRows([
-    ['Request ID', request.id],
-    ['Client', form.clientLabel],
-    ['PIC', form.picName],
-    ['Location', form.locationText],
-    ['Machine', form.equipmentLabel],
-    ['Model', form.brand],
-    ['Serial', form.serialNumber],
-    ['Start Time', form.startTimeDisplay],
-    ['Finish Time', form.finishTimeDisplay],
-    ['Form code', asText(form.formCode) || 'FPC011'],
-    ['Operation date (printed)', form.operationDateText],
-    ['Symptom', asText(request.symptom) || '—'],
-  ])
+  // 1. Same pairing / order as report-confirm “More header fields” (two-column grid)
+  drawHeaderTwoColumnGrid()
 
   // 2. FOR — show selected classification only (Warranty XOR Billing)
   doc.font('Helvetica-Bold').fontSize(9).text('FOR')

@@ -50,6 +50,8 @@ export interface MaintenanceRequestRecord {
   completed_at: string | null
   created_at: string
   updated_at: string
+  /** Filled when emailing customer report; drives Maintenance Report PDF layout */
+  mechanic_report_snapshot?: Record<string, unknown> | null
 }
 
 export interface CreateMaintenanceRequestInput {

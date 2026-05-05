@@ -1,210 +1,165 @@
-# 壽司郎香港 店舗メンテナンス管理システム
-## Sushiro Hong Kong - Store Maintenance Management System
+# FUJIMAK メンテナンスポータル
 
-<p align="center">
-  <img src="public/images/logo.png" alt="Sushiro Logo" width="200">
-</p>
+フィリピン **Angel's Pizza** 各店向けの Web アプリです。**Fujimak（フジマック）** が担当する厨房機器メンテナンスの依頼・進捗・連絡・部品・請求関連ワークフローを、店舗スタッフ・管理者・協力メカニックが同じシステム上で扱えるようにします。
 
-## 🎯 プロジェクト概要
+- **本番（例）**: [fujimak-maintenance.vercel.app](https://fujimak-maintenance.vercel.app)
+- **ソース**: [github.com/cantoneseslang/fujimak](https://github.com/cantoneseslang/fujimak)
 
-FOOD & LIFE COMPANIES（あきんどスシロー）のDX戦略に基づき、香港全40店舗のメンテナンス業務を一元管理するプラットフォームです。
+---
+
+## プロジェクト概要
+
+### ブランド・対象
+
+- 画面上は **Fujimak × Angel's Pizza** のジョイント表記（ヘッダーロゴなど）。
+- 店舗マスタは Angel's Pizza 公式サイト由来のロケーション API から同期したデータを `src/lib/angelStores.ts` に保持（リポジトリ時点で **約 108 店舗分**のエントリ。運用時は実データに合わせて更新）。
 
 ### コンセプト
 
-> 「社外パートナーと情報共有可能とするプラットフォームの構築」
-> 「店舗オペレーションの最適化・自動化」
-
-これらの経営方針に則り、店舗と設備業者間のコミュニケーションをデジタル化し、業務効率化とコスト削減を実現します。
+店舗からの修理依頼をフォームで統一し、管理者がガント状カレンダーで俯瞰しつつ、サポートチャット・メカニック派遣・部品発注・インボイスまでを DB 上のワークフローで追えるようにする「メンテナンス業務のハブ」です。
 
 ---
 
-## 📊 システム構成
+## 主な機能
 
-### 対象店舗
-- **香港全域 40店舗**
-  - 新界エリア: 20店舗
-  - 九龍エリア: 16店舗
-  - 香港島エリア: 4店舗
+### 店舗・スタッフ向け
 
-### 連携業者
-| 業者名 | 担当分野 |
-|--------|----------|
-| LIFESUPPORT (HK) LIMITED | 総合設備メンテナンス |
-| Fujimak | 厨房機器メンテナンス |
+| 領域 | 内容 |
+|------|------|
+| メンテナンス依頼 | エリア／項目／緊急度／詳細・写真／希望日程などのステップ入力（`maintenance`）。機種優先フローなどは `FUJIMAK_MAINTENANCE_FLOW` で切替可能。 |
+| ダッシュボード・履歴・通知 | 店舗ホーム、過去依頼一覧、通知一覧。 |
+| サポート AI チャット | `support`：Gemini を用いた対話・スレッド管理（`src/app/api/chat`）。 |
+| 部品発注 | `parts`／`parts/confirm`：カタログ選択・PDF・ワークフロー連携。 |
+| その他 | `troubleshooting`（トラブルシュート）、`manual`（マニュアル）、`customer-call`（クレーム窓口）、店舗選択 `stores` など。 |
 
----
+### 管理者・オペレーション向け
 
-## 🚀 主要機能
+| 領域 | 内容 |
+|------|------|
+| 管理画面 | `management`：全店メンテナンスの一覧・ガント風カレンダー・ステータス集計。 |
+| サポートスレッド | スレッド閲覧、派遣（dispatch）、ワークフロー状態（進行中／書類／インボイス待ちなど）。 |
+| 部品ワークフロー | 部品オーダー系ワークフローの確認とインボイス起点の処理。 |
+| 書類・アーカイブ | `management/docs`、完了ドキュメント API（`api/completed-documents`）など。 |
+| 請求・インボイス | `management/invoice` および関連 API（メカニック／パーツの invoice・再発行）。 |
 
-### 1. 店舗スタッフ向け機能
-- **メンテナンスコール**: 6ステップで簡単に修理依頼
-  1. エリア選択（全域/店外/厨房/配膳間/洗手間/員工室）
-  2. 項目選択（43種類のメンテナンス項目）
-  3. 緊急度選択（緊急/普通/見積もり）
-  4. 詳細入力（写真添付対応）
-  5. スケジュール選択（カレンダー＋時間指定）
-  6. 確認・送信
+### メカニック・協力会社向け
 
-- **リクエスト履歴**: 過去の依頼状況を一覧表示
-- **通知機能**: 業者からの日程変更提案を受信・承認
+| 領域 | 内容 |
+|------|------|
+| メカニック画面 | `mechanic`：案件対応、作業報告・請求連携。 |
+| ボード | `mechanic/board`：アサイン案件の俯瞰。 |
+| 報告確認 | `mechanic/report-confirm`：提出内容の確認フロー。 |
 
-### 2. 管理者向け機能
-- **全店舗ダッシュボード**: 40店舗のメンテナンス状況を一元管理
-- **ガントチャートカレンダー**: 2週間〜無限スクロールで進捗確認
-- **ステータスフィルター**: 待機中/進行中/完了で絞り込み
+### 認証・アクセス
 
-### 3. 多言語対応
-- 🇯🇵 日本語
-- 🇭🇰 繁體中文
-- 🇬🇧 English
+- **Supabase Auth**（メール等）に加え、`access_policies` テーブルによる **試用期間（30 日）／恒久**などのアクセス制御（`src/lib/accessPolicy.ts`、`middleware.ts`）。
+- 開発時は `localhost` で認証バイパス可能。本番同等で試す場合は `.env.local` に `DEV_REQUIRE_AUTH=1`。
 
----
+### 多言語（next-intl）
 
-## 💡 期待される効果
-
-### 業務効率化
-| Before | After |
-|--------|-------|
-| 各店舗が個別に業者へ電話連絡 | アプリから統一フォーマットで依頼 |
-| メンテナンス状況が店舗ごとに分散 | 管理画面で全店舗を一元管理 |
-| 紙ベースでの記録・報告 | デジタルで履歴管理・検索可能 |
-
-### コスト削減
-- 連絡調整工数の削減
-- 重複発注の防止
-- 緊急対応の最適化
+- 日本語（`ja`）、英語（`en`）、繁体字中国語（`zh`）、タガログ語（`tl`）。文言は `messages/*.json`。デフォルトロケールは `src/i18n/config.ts` で `en`。
 
 ---
 
-## 🛠 技術スタック
+## 技術スタック
 
-| カテゴリ | 技術 |
-|----------|------|
-| フレームワーク | Next.js 16 (App Router) |
-| 言語 | TypeScript |
-| スタイリング | Tailwind CSS |
-| 国際化 | next-intl |
-| データベース | Supabase (PostgreSQL) |
-| ホスティング | Vercel |
-| 日付処理 | date-fns |
+| 項目 | 技術 |
+|------|------|
+| フレームワーク | Next.js 16（App Router） |
+| UI | React 19、Tailwind CSS 4 |
+| i18n | next-intl |
+| DB / Auth | Supabase（PostgreSQL、SSR クッキーは `@supabase/ssr`） |
+| メール | nodemailer（通知・派遣メール等） |
+| PDF | pdfkit（サーバ側、External package 設定済み） |
+| AI | Google Generative AI（Gemini、`GEMINI_API_KEY`） |
+| 動画制作 | Remotion 4（プロモ動画コンポジション） |
+| ホスティング | Vercel（Analytics 利用可） |
 
 ---
 
-## 📁 プロジェクト構成
+## ディレクトリ構成（抜粋）
 
 ```
-sushiro-maintenance/
-├── src/
-│   ├── app/
-│   │   ├── page.tsx          # スプラッシュ画面
-│   │   ├── stores/           # 店舗選択
-│   │   ├── dashboard/        # ダッシュボード
-│   │   ├── maintenance/      # メンテナンスコール
-│   │   ├── history/          # リクエスト履歴
-│   │   ├── notifications/    # 通知画面
-│   │   ├── management/       # 管理者画面
-│   │   └── settings/         # 設定
-│   ├── components/
-│   │   ├── Header.tsx        # ヘッダー（言語切替含む）
-│   │   └── BottomNav.tsx     # フッターナビ
-│   └── lib/
-│       └── constants.ts      # マスターデータ
-├── messages/
-│   ├── ja.json               # 日本語翻訳
-│   ├── zh.json               # 繁體中文翻訳
-│   └── en.json               # English翻訳
-└── public/
-    └── data/
-        ├── maintenance_categories.csv
-        ├── maintenance_items.csv
-        └── urgency_levels.csv
+fujimak-maintenance/
+├── src/app/                 # App Router（ページ・Route Handlers）
+│   ├── api/                 # REST API（メンテナンス、チャット、部品、請求、設定など）
+│   ├── auth/                # サインイン・確認メール（confirm）
+│   ├── management/          # 管理・書類・インボイス
+│   ├── mechanic/            # メカニック・ボード・報告確認
+│   ├── parts/               # 部品発注フロー
+│   └── support/             # サポートチャット UI
+├── src/components/          # Header、BottomNav、ChatbotWidget 等
+├── src/lib/                 # Supabase クライアント、ドメインロジック、店舗データ
+├── messages/                # 翻訳 JSON
+├── public/
+│   ├── data/                # メンテ CSV（カテゴリ・項目・緊急度）
+│   └── images/              # Fujimak / Angel's ロゴ等
+├── supabase/migrations/     # DB マイグレーション（ポータルコア、ワークフロー等）
+├── remotion/                # プロモーション動画シーン
+└── scripts/                 # PPTX 生成・検証スクリプト等
 ```
 
----
-
-## 📱 画面一覧
-
-| 画面 | 説明 | URL |
-|------|------|-----|
-| スプラッシュ | 起動画面 | `/` |
-| 店舗選択 | 地区別店舗選択 | `/stores` |
-| ダッシュボード | 店舗ホーム画面 | `/dashboard` |
-| メンテナンスコール | 修理依頼フォーム | `/maintenance` |
-| リクエスト履歴 | 過去の依頼一覧 | `/history` |
-| 通知 | 業者からの通知 | `/notifications` |
-| 管理者画面 | 全店舗管理 | `/management` |
-| 設定 | 言語・業者設定 | `/settings` |
+ローカル開発用にクローンした Cursor skill リポジトリは `.gitignore` で `skill-repos/` を除外しています（本体アプリとは別管理）。
 
 ---
 
-## 🔧 開発環境セットアップ
+## 環境変数（概要）
+
+値はコミットしないでください。`.env.example` が無い場合は、以下を `.env.local` などに設定します。
+
+| 変数 | 用途 |
+|------|------|
+| `NEXT_PUBLIC_FUJIMAK_SUPABASE_URL` / `NEXT_PUBLIC_FUJIMAK_SUPABASE_ANON_KEY` | ブラウザ・サーバ用 Supabase（旧名 `NEXT_PUBLIC_SUPABASE_*` でも可） |
+| `FUJIMAK_SUPABASE_SERVICE_ROLE_KEY` / `SUPABASE_SERVICE_ROLE_KEY` | サーバ限定・管理者 API |
+| `NEXT_PUBLIC_SITE_URL` | メール確認リンク等の公開オリジン（未設定時は `VERCEL_URL`） |
+| `GEMINI_API_KEY` / `GEMINI_MODEL` | サポートチャット AI |
+| `SMTP_*`（`SMTP_HOST`、`SMTP_USER`、`SMTP_PASS` 等） | メール送信 |
+| `FUJIMAK_MAINTENANCE_TO` | メンテナンス通知の宛先など |
+| `FUJIMAK_MAINTENANCE_FLOW` | メンテナンスフォームのフロー（例: `machine_first`） |
+| `DEV_REQUIRE_AUTH` / `DEV_SKIP_AUTH` | 開発時の認証挙動 |
+
+---
+
+## 開発コマンド
 
 ```bash
-# 依存関係インストール
 npm install
-
-# 開発サーバー起動
-npm run dev
-
-# ビルド
+npm run dev          # Next.js（webpack モード指定済み）
 npm run build
-
-# 本番デプロイ
-npx vercel --prod
+npm run start        # 本番ビルド後のローカル起動
+npm run lint
 ```
 
----
+### Remotion（プロモ動画）
 
-## 🎬 営業プロモ動画（Remotion）
+コンポジションは `PromoZh`（繁体中文コピー前提）。出力はリポジトリルートの `out/`。
 
-16:9・約120秒・繁體中文テキストの営業用プロモ動画を Remotion で制作・レンダリングできます。
+```bash
+npm run remotion:preview   # プレビュー
+npm run remotion:short     # 短いサンプル MP4
+npm run remotion:render    # フル尺 MP4
+```
 
-**動画を「見る」手順（このリポジトリのルートで）:**
+### DB
 
-1. **プレビューで見る**（ブラウザでタイムライン操作）  
-   ```bash
-   cd sushiro-maintenance && npm run remotion:preview
-   ```  
-   起動後、ブラウザが開いたら「PromoZh」を選んで再生。
-
-2. **短いサンプルをすぐファイルで見る**（約40秒・軽いレンダー）  
-   ```bash
-   cd sushiro-maintenance && npm run remotion:short
-   ```  
-   完了後、**`sushiro-maintenance/out/promo-zh-short.mp4`** をダブルクリックで再生。
-
-3. **フル尺の MP4 を出力する**（約120秒・数分かかります）  
-   ```bash
-   cd sushiro-maintenance && npm run remotion:render
-   ```  
-   完了後、**`sushiro-maintenance/out/promo-zh.mp4`** を再生。
-
-- **構成**: `remotion/`（Root・PromoZh・各 Scene・3D 部品・コピー）
+マイグレーションは `supabase/migrations/`。本番 DB への適用は Supabase CLI またはダッシュボードの運用に従ってください。
 
 ---
 
-## 🌐 本番環境
+## デプロイ
 
-**URL**: https://sushiro-maintenance.vercel.app
-
----
-
-## 📅 導入スケジュール（案）
-
-### Phase 1: パイロット導入（1-2ヶ月）
-- 対象: 5店舗（新界エリア選抜）
-- 目的: システム検証・フィードバック収集
-
-### Phase 2: 全店展開（2-3ヶ月）
-- 対象: 香港全40店舗
-- 目的: 本格運用開始
+- **Vercel**: プロジェクト連携後、`main` への push で自動ビルドする運用が可能。手動ならリポジトリルートで `npx vercel deploy --prod`（`.vercel` は個人環境用のため Git には含めません）。
+- **GitHub**: [cantoneseslang/fujimak](https://github.com/cantoneseslang/fujimak)
 
 ---
 
-## 📞 お問い合わせ
+## 関連ドキュメント
 
-**開発・運営**: LIFESUPPORT (HK) LIMITED
+- `docs/` … スキーマ SQL、運用メモ、資料類（社内向け）
+- `.cursor/rules/mobile-footer-overlap.mdc` … モバイル固定フッターとコンテンツの重なり対策（実装時の注意）
 
 ---
 
-© 2026 LIFESUPPORT (HK) LIMITED. All Rights Reserved.
+## ライセンス・権利表示
+
+ロゴ・商標は各権利者に帰属します。本 README はリポジトリの技術説明用です。契約・保守・問い合わせ窓口についてはプロジェクト当事者に従ってください。

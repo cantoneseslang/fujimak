@@ -7,6 +7,8 @@ import {
   uploadArchivedPdf,
 } from '@/lib/documentArchiveStorage'
 import type { MaintenanceRequestRecord } from '@/lib/maintenance'
+import { buildMaintenanceReportFormState } from '@/lib/maintenanceReportForm'
+import { getPublicSiteUrl } from '@/lib/siteUrl'
 
 export const runtime = 'nodejs'
 
@@ -91,6 +93,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Request not found' }, { status: 404 })
     }
     const record = data as MaintenanceRequestRecord
+    const mergedReportForm = buildMaintenanceReportFormState(record, record.mechanic_report_snapshot ?? undefined)
 
     const reportNo = `INV-${new Date().toISOString().slice(0, 10).replaceAll('-', '')}-${Math.floor(
       1000 + Math.random() * 9000
@@ -103,6 +106,8 @@ export async function POST(request: NextRequest) {
       reportTitle: 'INVOICE',
       invoiceAmount,
       invoiceWorkDescription,
+      maintenanceReport: mergedReportForm,
+      footerSiteUrl: getPublicSiteUrl(),
     })
     const filename = `${reportNo}.pdf`
     const archivePath = maintenanceInvoiceArchivePath(requestId, filename)

@@ -2,10 +2,20 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { Download, FileCheck2, RotateCcw, Send, X } from 'lucide-react'
 import Header from '@/components/Header'
 import BottomNav from '@/components/BottomNav'
+import RankWheelPicker from '@/components/RankWheelPicker'
 import type { MaintenanceRequestRecord } from '@/lib/maintenance'
+import {
+  MAINTENANCE_CHECKLIST_LABELS,
+  MAINTENANCE_CHECKLIST_COMMENT_MAX,
+  defaultMaintenanceReportForm,
+  type MaintenanceReportFormSnapshot,
+  buildMaintenanceReportFormState,
+} from '@/lib/maintenanceReportForm'
+import { clearMechanicReportDraft, loadMechanicReportDraft } from '@/lib/mechanicReportDraft'
 
 type WorkAttachment = {
   name: string
@@ -22,6 +32,7 @@ type DemoMedia = {
 }
 
 type DemoReportDraft = {
+  storeId?: string
   storeName?: string
   machineName?: string
   machineModel?: string
@@ -124,9 +135,10 @@ function buildDemoRecord(draft: DemoReportDraft): MaintenanceRequestRecord {
     ...toAttachment(draft.afterMedia, 'mechanic_after'),
   ]
 
+  const sid = asText(draft.storeId) || 'demo-store'
   return {
-    id: 'demo-report',
-    store_id: 'demo-store',
+    id: `demo-mechanic-${sid}`,
+    store_id: sid,
     store_name: asText(draft.storeName) || 'Demo Store',
     category_id: 'kitchen',
     item_id: 'jet-oven',
@@ -168,6 +180,7 @@ function buildDemoRecord(draft: DemoReportDraft): MaintenanceRequestRecord {
 export default function MechanicReportConfirmPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const tm = useTranslations('mechanic')
   const isDemoMode = searchParams.get('demo') === '1'
   const requestId = searchParams.get('requestId') || ''
   const initialEmail = searchParams.get('email') || ''
@@ -182,6 +195,7 @@ export default function MechanicReportConfirmPage() {
   const [isModeConfirmOpen, setIsModeConfirmOpen] = useState(false)
   const [signatureDataUrl, setSignatureDataUrl] = useState('')
   const [isSignModalOpen, setIsSignModalOpen] = useState(false)
+  const [reportForm, setReportForm] = useState<MaintenanceReportFormSnapshot>(() => defaultMaintenanceReportForm())
   const modeDialogAutoCloseTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
@@ -229,6 +243,22 @@ export default function MechanicReportConfirmPage() {
     }
     void load()
   }, [initialEmail, isDemoMode, requestId])
+
+  useEffect(() => {
+    if (!record) return
+    const base = buildMaintenanceReportFormState(record, record.mechanic_report_snapshot)
+    const draft = loadMechanicReportDraft(record.id)
+    if (!draft) {
+      setReportForm(base)
+      return
+    }
+    setReportForm({
+      ...base,
+      forBilling: draft.forBilling,
+      billingNote: draft.billingNote,
+      concern: draft.concern,
+    })
+  }, [record])
 
   useEffect(() => {
     return () => {
@@ -356,6 +386,7 @@ export default function MechanicReportConfirmPage() {
           customerEmail,
           mode: 'download',
           signatureDataUrl,
+          maintenanceReport: reportForm,
         }),
       })
       if (!response.ok) {
@@ -368,7 +399,7 @@ export default function MechanicReportConfirmPage() {
       }
       const blob = await response.blob()
       const cd = response.headers.get('Content-Disposition')
-      let filename = 'acceptance-report.pdf'
+      let filename = 'maintenance-report.pdf'
       const m = cd?.match(/filename="([^"]+)"/)
       if (m?.[1]) filename = m[1]
       const url = URL.createObjectURL(blob)
@@ -378,7 +409,7 @@ export default function MechanicReportConfirmPage() {
       a.rel = 'noopener'
       a.click()
       URL.revokeObjectURL(url)
-      setFeedback({ type: 'success', message: 'Acceptance report PDF downloaded.' })
+      setFeedback({ type: 'success', message: 'Maintenance report PDF downloaded.' })
     } catch (error) {
       setFeedback({
         type: 'error',
@@ -407,6 +438,7 @@ export default function MechanicReportConfirmPage() {
           customerEmail,
           mode: 'send',
           signatureDataUrl,
+          maintenanceReport: reportForm,
         }),
       })
       const json = (await response.json()) as {
@@ -424,6 +456,7 @@ export default function MechanicReportConfirmPage() {
           ? `Report sent to ${json.recipient || customerEmail || 'customer'}, but workflow update failed: ${json.stateUpdateError}`
           : `Report sent to ${json.recipient || customerEmail || 'customer'}. Waiting for invoice issuance.`,
       })
+      clearMechanicReportDraft()
     } catch (error) {
       setFeedback({
         type: 'error',
@@ -437,7 +470,7 @@ export default function MechanicReportConfirmPage() {
   if (!isDemoMode && !requestId) {
     return (
       <div className="min-h-screen bg-gray-50 pb-24">
-        <Header showBack title="Acceptance Report" />
+        <Header showBack title="Maintenance Report" />
         <main className="px-4 py-6">
           <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
             Missing requestId. Please go back and complete a work record first.
@@ -450,25 +483,315 @@ export default function MechanicReportConfirmPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header showBack title="Acceptance Report" onRightButtonTripleClick={openModeConfirmDialog} />
+      <Header showBack title="Maintenance Report" onRightButtonTripleClick={openModeConfirmDialog} />
 
-      <main className="px-3 py-5 sm:px-4 sm:py-6" style={{ paddingBottom: '350px' }}>
+      <main className="px-3 py-5 sm:px-4 sm:py-6" style={{ paddingBottom: '420px' }}>
         {loading ? (
           <div className="mx-auto max-w-[220mm] rounded-xl bg-white p-6 text-sm text-zinc-600 shadow-sm">
             Loading report...
           </div>
         ) : record ? (
-          <div className="mx-auto flex w-full max-w-[220mm] justify-center">
+          <div className="mx-auto flex w-full max-w-[220mm] flex-col justify-center gap-4">
+            <details
+              open
+              className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm"
+              style={{ marginLeft: '6px', width: 'calc(100% - 6px)' }}
+            >
+              <summary className="cursor-pointer text-sm font-semibold text-zinc-900">
+                Maintenance report — finish (PDF)
+              </summary>
+              <p className="mt-2 text-xs text-zinc-500">
+                Edit before Save PDF / Send. FOR / checklist / ranking appear on the printed Maintenance Report (overview photo uses attachment source “mechanic_overview” when added).
+              </p>
+
+              <div className="mt-4 space-y-4 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-zinc-800">{tm('forBillingTitle')}</p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setReportForm((p) => ({ ...p, forBilling: 'warranty' }))}
+                      className={`min-h-[44px] flex-1 rounded-xl px-3 text-sm font-semibold shadow-sm transition-colors sm:max-w-[160px] ${
+                        reportForm.forBilling === 'warranty'
+                          ? 'bg-red-600 text-white'
+                          : 'border border-zinc-300 bg-white text-zinc-800'
+                      }`}
+                    >
+                      {tm('warranty')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setReportForm((p) => ({ ...p, forBilling: 'billing' }))}
+                      className={`min-h-[44px] flex-1 rounded-xl px-3 text-sm font-semibold shadow-sm transition-colors sm:max-w-[160px] ${
+                        reportForm.forBilling === 'billing'
+                          ? 'bg-red-600 text-white'
+                          : 'border border-zinc-300 bg-white text-zinc-800'
+                      }`}
+                    >
+                      {tm('billing')}
+                    </button>
+                  </div>
+                </div>
+                <label className="flex flex-col gap-1 text-xs font-medium text-zinc-700">
+                  {tm('billingNoteLabel')}
+                  <input
+                    value={reportForm.billingNote}
+                    onChange={(e) => setReportForm((p) => ({ ...p, billingNote: e.target.value }))}
+                    className="rounded-lg border border-zinc-300 bg-white px-2 py-2 text-sm"
+                    placeholder={tm('billingNotePlaceholder')}
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-xs font-medium text-zinc-700">
+                  {tm('concernLabel')}
+                  <textarea
+                    value={reportForm.concern}
+                    onChange={(e) => setReportForm((p) => ({ ...p, concern: e.target.value }))}
+                    rows={2}
+                    className="rounded-lg border border-zinc-300 bg-white px-2 py-2 text-sm"
+                    placeholder={tm('concernPlaceholder')}
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-xs font-medium text-zinc-700">
+                  Action taken
+                  <textarea
+                    value={reportForm.actionTaken}
+                    onChange={(e) => setReportForm((p) => ({ ...p, actionTaken: e.target.value }))}
+                    rows={3}
+                    className="rounded-lg border border-zinc-300 bg-white px-2 py-2 text-sm"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-xs font-medium text-zinc-700">
+                  Recommendation
+                  <textarea
+                    value={reportForm.recommendation}
+                    onChange={(e) => setReportForm((p) => ({ ...p, recommendation: e.target.value }))}
+                    rows={2}
+                    className="rounded-lg border border-zinc-300 bg-white px-2 py-2 text-sm"
+                  />
+                </label>
+              </div>
+
+              <details className="mt-4 rounded-lg border border-zinc-200 bg-white px-3 py-2">
+                <summary className="cursor-pointer text-xs font-semibold text-zinc-800">
+                  More header fields (client / dates / equipment)
+                </summary>
+                <div className="mt-3 grid gap-3 pb-2 sm:grid-cols-2">
+                <label className="flex flex-col gap-1 text-xs font-medium text-zinc-700">
+                  Form code
+                  <input
+                    value={reportForm.formCode}
+                    onChange={(e) => setReportForm((p) => ({ ...p, formCode: e.target.value }))}
+                    className="rounded-lg border border-zinc-300 px-2 py-2 text-sm"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-xs font-medium text-zinc-700">
+                  Operation date (printed)
+                  <input
+                    value={reportForm.operationDateText}
+                    onChange={(e) => setReportForm((p) => ({ ...p, operationDateText: e.target.value }))}
+                    className="rounded-lg border border-zinc-300 px-2 py-2 text-sm"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-xs font-medium text-zinc-700">
+                  Client
+                  <input
+                    value={reportForm.clientLabel}
+                    onChange={(e) => setReportForm((p) => ({ ...p, clientLabel: e.target.value }))}
+                    className="rounded-lg border border-zinc-300 px-2 py-2 text-sm"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-xs font-medium text-zinc-700">
+                  PIC
+                  <input
+                    value={reportForm.picName}
+                    onChange={(e) => setReportForm((p) => ({ ...p, picName: e.target.value }))}
+                    className="rounded-lg border border-zinc-300 px-2 py-2 text-sm"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-xs font-medium text-zinc-700">
+                  Location
+                  <input
+                    value={reportForm.locationText}
+                    onChange={(e) => setReportForm((p) => ({ ...p, locationText: e.target.value }))}
+                    className="rounded-lg border border-zinc-300 px-2 py-2 text-sm"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-xs font-medium text-zinc-700">
+                  Equipment
+                  <input
+                    value={reportForm.equipmentLabel}
+                    onChange={(e) => setReportForm((p) => ({ ...p, equipmentLabel: e.target.value }))}
+                    className="rounded-lg border border-zinc-300 px-2 py-2 text-sm"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-xs font-medium text-zinc-700">
+                  Brand
+                  <input
+                    value={reportForm.brand}
+                    onChange={(e) => setReportForm((p) => ({ ...p, brand: e.target.value }))}
+                    className="rounded-lg border border-zinc-300 px-2 py-2 text-sm"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-xs font-medium text-zinc-700">
+                  Start time (display)
+                  <input
+                    value={reportForm.startTimeDisplay}
+                    onChange={(e) => setReportForm((p) => ({ ...p, startTimeDisplay: e.target.value }))}
+                    className="rounded-lg border border-zinc-300 px-2 py-2 text-sm"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-xs font-medium text-zinc-700">
+                  Finish time (display)
+                  <input
+                    value={reportForm.finishTimeDisplay}
+                    onChange={(e) => setReportForm((p) => ({ ...p, finishTimeDisplay: e.target.value }))}
+                    className="rounded-lg border border-zinc-300 px-2 py-2 text-sm"
+                  />
+                </label>
+                </div>
+              </details>
+              <div className="mt-4 space-y-3">
+                <div>
+                  <p className="text-xs font-semibold text-zinc-800">Technical checklist comments</p>
+                  <p className="mt-1 text-[11px] text-zinc-500">
+                    Tap NA or type a comment (max {MAINTENANCE_CHECKLIST_COMMENT_MAX} characters per line).
+                  </p>
+                </div>
+                <div className="flex flex-col gap-3">
+                  {MAINTENANCE_CHECKLIST_LABELS.map((label, idx) => {
+                    const stored = reportForm.checklistComments[idx] ?? 'NA'
+                    const isNaChoice = stored === 'NA'
+                    return (
+                      <div key={label} className="rounded-lg border border-zinc-200 bg-white p-2.5 shadow-sm">
+                        <div className="flex flex-wrap items-start gap-2">
+                          <p className="min-w-0 flex-1 text-xs font-medium text-zinc-800">
+                            <span className="font-semibold text-zinc-600">{idx + 1}.</span> {label}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setReportForm((p) => {
+                                const next = [...p.checklistComments]
+                                next[idx] = 'NA'
+                                return { ...p, checklistComments: next }
+                              })
+                            }
+                            className={`shrink-0 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                              isNaChoice
+                                ? 'border-red-600 bg-red-600 text-white'
+                                : 'border-zinc-300 bg-zinc-50 text-zinc-700 hover:bg-zinc-100'
+                            }`}
+                          >
+                            NA
+                          </button>
+                        </div>
+                        <input
+                          type="text"
+                          value={isNaChoice ? '' : stored}
+                          placeholder={isNaChoice ? 'NA' : 'Comment'}
+                          onChange={(e) => {
+                            const v = e.target.value.slice(0, MAINTENANCE_CHECKLIST_COMMENT_MAX)
+                            setReportForm((p) => {
+                              const next = [...p.checklistComments]
+                              next[idx] = v
+                              return { ...p, checklistComments: next }
+                            })
+                          }}
+                          onBlur={() =>
+                            setReportForm((p) => {
+                              const next = [...p.checklistComments]
+                              const cur = (next[idx] ?? '').trim()
+                              next[idx] = cur === '' ? 'NA' : cur.slice(0, MAINTENANCE_CHECKLIST_COMMENT_MAX)
+                              return { ...p, checklistComments: next }
+                            })
+                          }
+                          className="mt-2 w-full rounded-lg border border-zinc-300 px-2 py-2 text-sm"
+                        />
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <p id="maintenance-rank-label" className="text-xs font-semibold text-zinc-800">
+                    Ranking
+                  </p>
+                  <RankWheelPicker
+                    ariaLabelledBy="maintenance-rank-label"
+                    value={reportForm.rank}
+                    onChange={(rank) => setReportForm((p) => ({ ...p, rank }))}
+                  />
+                </div>
+                <div className="flex flex-col gap-3">
+                  <label className="flex flex-col gap-1 text-xs font-medium text-zinc-700">
+                    Condition
+                    <select
+                      value={reportForm.conditionLevel}
+                      onChange={(e) =>
+                        setReportForm((p) => ({
+                          ...p,
+                          conditionLevel: e.target.value as MaintenanceReportFormSnapshot['conditionLevel'],
+                        }))
+                      }
+                      className="rounded-lg border border-zinc-300 px-2 py-2 text-sm"
+                    >
+                      <option value="perfect">O Perfect</option>
+                      <option value="not_good">Δ Not good</option>
+                      <option value="dangerous">× Dangerous</option>
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-1 text-xs font-medium text-zinc-700">
+                    Status(F)
+                    <input
+                      value={reportForm.statusF}
+                      onChange={(e) => setReportForm((p) => ({ ...p, statusF: e.target.value }))}
+                      className="rounded-lg border border-zinc-300 px-2 py-2 text-sm"
+                    />
+                  </label>
+                </div>
+              </div>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <label className="flex flex-col gap-1 text-xs font-medium text-zinc-700">
+                  Technician name
+                  <input
+                    value={reportForm.technicianName}
+                    onChange={(e) => setReportForm((p) => ({ ...p, technicianName: e.target.value }))}
+                    className="rounded-lg border border-zinc-300 px-2 py-2 text-sm"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-xs font-medium text-zinc-700">
+                  Supervisor name
+                  <input
+                    value={reportForm.supervisorName}
+                    onChange={(e) => setReportForm((p) => ({ ...p, supervisorName: e.target.value }))}
+                    className="rounded-lg border border-zinc-300 px-2 py-2 text-sm"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-xs font-medium text-zinc-700 sm:col-span-2">
+                  Client signatory name (printed)
+                  <input
+                    value={reportForm.clientSignatoryName}
+                    onChange={(e) => setReportForm((p) => ({ ...p, clientSignatoryName: e.target.value }))}
+                    className="rounded-lg border border-zinc-300 px-2 py-2 text-sm"
+                  />
+                </label>
+              </div>
+            </details>
+
             <section className="flex min-h-[min(85vh,297mm)] w-full max-w-[210mm] flex-col rounded-sm border border-zinc-300/90 bg-white p-6 shadow-[0_12px_40px_-12px_rgba(0,0,0,0.25),0_4px_16px_-4px_rgba(0,0,0,0.12)] sm:min-h-[297mm] sm:p-8 md:p-10">
               <div className="mb-6 border-b border-zinc-200 pb-4">
                 <p className="text-center text-sm font-semibold tracking-wide text-zinc-700">
                   FUJIMAK PHILIPPINES CORPORATION
                 </p>
                 <h1 className="text-center text-lg font-bold tracking-tight text-zinc-900 sm:text-xl">
-                  ACCEPTANCE REPORT
+                  Maintenance Report
                 </h1>
                 <div className="mt-2 flex flex-col items-end gap-1">
-                  <p className="text-xs font-medium text-zinc-700">mechanician:sakon hiroki</p>
+                  <p className="text-xs font-medium text-zinc-700">
+                    Technician: {reportForm.technicianName?.trim() || '—'}
+                  </p>
                   <div className="inline-flex rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-600">
                     {new Date().toLocaleString()}
                   </div>

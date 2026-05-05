@@ -4,6 +4,8 @@ import { getSupabaseAdmin } from '@/lib/supabaseAdmin'
 import { buildMechanicWorkReportPdf } from '@/lib/mechanicWorkReportPdf'
 import { parsePartsOrderDraftFromBody } from '@/lib/partsOrderApi'
 import { buildPartsOrderPdf } from '@/lib/partsOrderPdf'
+import { buildMaintenanceReportFormState } from '@/lib/maintenanceReportForm'
+import { getPublicSiteUrl } from '@/lib/siteUrl'
 import {
   getArchiveBucketName,
   maintenanceInvoiceArchivePath,
@@ -113,6 +115,8 @@ export async function POST() {
       if (exists) continue
 
       const record = row as unknown as MaintenanceRequestRecord
+      const mergedReportForm = buildMaintenanceReportFormState(record, row.mechanic_report_snapshot ?? undefined)
+      const footerSiteUrl = getPublicSiteUrl()
       const reportNo = filename.replace(/\.pdf$/i, '') || `${isInvoice ? 'INV' : 'WR'}-${requestId}`
       const issuedAtText = (() => {
         const raw = isInvoice ? asText(row.invoice_issued_at) : asText(row.completed_at) || asText(row.updated_at)
@@ -130,11 +134,15 @@ export async function POST() {
             reportTitle: 'INVOICE',
             invoiceAmount: invoiceAmount ?? undefined,
             invoiceWorkDescription: asText(row.invoice_work_description),
+            maintenanceReport: mergedReportForm,
+            footerSiteUrl,
           })
         : await buildMechanicWorkReportPdf({
             request: record,
             reportNo,
             issuedAtText,
+            maintenanceReport: mergedReportForm,
+            footerSiteUrl,
           })
       await uploadArchivedPdf({
         supabase,

@@ -12,6 +12,8 @@ import {
   type MaintenanceStatus,
   type MaintenanceRequestRecord,
 } from '@/lib/maintenance'
+import type { ForBillingOption } from '@/lib/maintenanceReportForm'
+import { loadMechanicReportDraft, saveMechanicReportDraft } from '@/lib/mechanicReportDraft'
 
 type LocalMedia = {
   id: string
@@ -120,6 +122,9 @@ export default function MechanicPage() {
   const [beforeMedia, setBeforeMedia] = useState<LocalMedia[]>([])
   const [afterMedia, setAfterMedia] = useState<LocalMedia[]>([])
   const [comment, setComment] = useState('')
+  const [forBilling, setForBilling] = useState<ForBillingOption>('billing')
+  const [billingNote, setBillingNote] = useState('')
+  const [concern, setConcern] = useState('')
   const [customerEmail, setCustomerEmail] = useState('')
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -205,12 +210,43 @@ export default function MechanicPage() {
       setBeforeMedia([])
       setAfterMedia([])
       setComment('')
+      setForBilling('billing')
+      setBillingNote('')
+      setConcern('')
       setCustomerEmail('')
       setWorkStartSavedAt(null)
     }
   }, [effectiveRequests, searchParams, selectedRequestId])
 
   const selectedRequest = effectiveRequests.find((request) => request.id === selectedRequestId) ?? null
+
+  useEffect(() => {
+    if (!selectedRequest) return
+    const draft = loadMechanicReportDraft(selectedRequest.id)
+    if (draft) {
+      setForBilling(draft.forBilling)
+      setBillingNote(draft.billingNote)
+      setConcern(draft.concern)
+      return
+    }
+    setForBilling('billing')
+    setBillingNote('')
+    setConcern(selectedRequest.symptom ?? '')
+  }, [selectedRequest?.id])
+
+  useEffect(() => {
+    if (!selectedRequest) return
+    const id = selectedRequest.id
+    const handle = window.setTimeout(() => {
+      saveMechanicReportDraft({
+        requestId: id,
+        forBilling,
+        billingNote,
+        concern,
+      })
+    }, 350)
+    return () => window.clearTimeout(handle)
+  }, [selectedRequest?.id, forBilling, billingNote, concern])
   useEffect(() => {
     if (!selectedRequestId) {
       setCustomerEmail('')
@@ -286,6 +322,9 @@ export default function MechanicPage() {
     setBeforeMedia([])
     setAfterMedia([])
     setComment('')
+    setForBilling('billing')
+    setBillingNote('')
+    setConcern('')
     setCustomerEmail('')
     setWorkStartSavedAt(null)
     setError(null)
@@ -443,6 +482,7 @@ export default function MechanicPage() {
         if (markCompleted) {
           setWorkStartSavedAt(null)
           const payload = {
+            storeId: selectedRequest.store_id,
             storeName: selectedRequest.store_name || 'Demo Store',
             machineName: selectedRequest.machine_name || selectedRequest.machine_model || 'DEMO Jet Oven',
             machineModel: selectedRequest.machine_model || 'JO-DEMO-01',
@@ -471,6 +511,12 @@ export default function MechanicPage() {
           if (customerEmail.trim().length > 0) {
             params.set('email', customerEmail.trim())
           }
+          saveMechanicReportDraft({
+            requestId: selectedRequest.id,
+            forBilling,
+            billingNote,
+            concern,
+          })
           router.push(`/mechanic/report-confirm?${params.toString()}`)
         }
         setMessage(markCompleted ? t('demoCompleted') : t('demoSaveSuccess'))
@@ -520,6 +566,12 @@ export default function MechanicPage() {
       if (trimmedEmail.length > 0) {
         params.set('email', trimmedEmail)
       }
+      saveMechanicReportDraft({
+        requestId: json.request.id,
+        forBilling,
+        billingNote,
+        concern,
+      })
       router.push(`/mechanic/report-confirm?${params.toString()}`)
     } catch (error) {
       setError(error instanceof Error ? error.message : t('saveFailed'))
@@ -532,7 +584,7 @@ export default function MechanicPage() {
     <div className="min-h-screen bg-gray-50">
       <Header showBack title={t('title')} onRightButtonTripleClick={openModeConfirmDialog} />
 
-      <main className="px-4 py-6 space-y-4" style={{ paddingBottom: '300px' }}>
+      <main className="px-4 py-6 space-y-4" style={{ paddingBottom: '380px' }}>
         <section className="rounded-xl bg-white p-4 shadow-sm">
           <p className="text-sm text-gray-600" style={{ marginLeft: '6px' }}>{subtitle}</p>
           <p className="mt-1 text-xs font-semibold text-zinc-700" style={{ marginLeft: '6px' }}>
@@ -663,6 +715,9 @@ export default function MechanicPage() {
                         setBeforeMedia([])
                         setAfterMedia([])
                         setComment('')
+                        setForBilling('billing')
+                        setBillingNote('')
+                        setConcern('')
                         setCustomerEmail('')
                         setWorkStartSavedAt(null)
                         setMessage(null)
@@ -795,6 +850,57 @@ export default function MechanicPage() {
                         {t('addAfterMedia')}
                       </button>
                     </div>
+                  </div>
+
+                  <div
+                    className="space-y-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3 shadow-sm"
+                    style={{ marginLeft: '6px', width: 'calc(100% - 6px)' }}
+                  >
+                    <p className="text-sm font-semibold text-gray-900">{t('forBillingTitle')}</p>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setForBilling('warranty')}
+                        className={`min-h-[44px] flex-1 rounded-xl px-3 text-sm font-semibold shadow-sm transition-colors sm:flex-none sm:min-w-[128px] ${
+                          forBilling === 'warranty'
+                            ? 'bg-red-600 text-white'
+                            : 'border border-gray-300 bg-white text-gray-800'
+                        }`}
+                      >
+                        {t('warranty')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setForBilling('billing')}
+                        className={`min-h-[44px] flex-1 rounded-xl px-3 text-sm font-semibold shadow-sm transition-colors sm:flex-none sm:min-w-[128px] ${
+                          forBilling === 'billing'
+                            ? 'bg-red-600 text-white'
+                            : 'border border-gray-300 bg-white text-gray-800'
+                        }`}
+                      >
+                        {t('billing')}
+                      </button>
+                    </div>
+                    <label className="flex flex-col gap-1 text-sm font-semibold text-gray-800">
+                      {t('billingNoteLabel')}
+                      <input
+                        value={billingNote}
+                        onChange={(event) => setBillingNote(event.target.value)}
+                        className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm font-normal text-gray-700 focus:border-zinc-900 focus:outline-none"
+                        placeholder={t('billingNotePlaceholder')}
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1 text-sm font-semibold text-gray-800">
+                      {t('concernLabel')}
+                      <textarea
+                        value={concern}
+                        onChange={(event) => setConcern(event.target.value)}
+                        rows={2}
+                        placeholder={t('concernPlaceholder')}
+                        className="w-full rounded-xl border border-gray-200 p-3 text-sm font-normal text-gray-700 focus:border-zinc-900 focus:outline-none"
+                      />
+                    </label>
+                    <p className="text-xs text-gray-500">{t('reportDraftHint')}</p>
                   </div>
 
                   <div className="space-y-2">

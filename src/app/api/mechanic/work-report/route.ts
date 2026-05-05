@@ -3,6 +3,8 @@ import nodemailer from 'nodemailer'
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin'
 import { buildMechanicWorkReportPdf } from '@/lib/mechanicWorkReportPdf'
 import type { MaintenanceRequestRecord } from '@/lib/maintenance'
+import { buildMaintenanceReportFormState, serializeMaintenanceReportForm } from '@/lib/maintenanceReportForm'
+import { getPublicSiteUrl } from '@/lib/siteUrl'
 
 export const runtime = 'nodejs'
 
@@ -129,6 +131,10 @@ export async function POST(request: NextRequest) {
     const demoData =
       body?.demoData && typeof body.demoData === 'object' ? (body.demoData as DemoReportPayload) : null
     const signatureDataUrl = asText(body?.signatureDataUrl)
+    const maintenanceReportRaw =
+      body?.maintenanceReport && typeof body.maintenanceReport === 'object'
+        ? body.maintenanceReport
+        : undefined
     const customerEmailFromBody = normalizeEmail(body?.customerEmail)
     const modeRaw = asText(body?.mode)
     const mode: WorkReportMode =
@@ -158,11 +164,15 @@ export async function POST(request: NextRequest) {
     const reportNo = `WR-${new Date().toISOString().slice(0, 10).replaceAll('-', '')}-${Math.floor(
       1000 + Math.random() * 9000
     )}`
+    const mergedReportForm = buildMaintenanceReportFormState(record, maintenanceReportRaw)
+
     const pdfBuffer = await buildMechanicWorkReportPdf({
       request: record,
       reportNo,
       issuedAtText: issuedAt,
       signatureDataUrl,
+      maintenanceReport: mergedReportForm,
+      footerSiteUrl: getPublicSiteUrl(),
     })
     const filename = `${reportNo}.pdf`
 
@@ -186,10 +196,10 @@ export async function POST(request: NextRequest) {
             },
           })
 
-          const subject = `Acceptance Report (${asText(record.store_name) || asText(record.store_id)})`
+          const subject = `Maintenance Report (${asText(record.store_name) || asText(record.store_id)})`
           const machineLabel = asText(record.machine_name) || asText(record.machine_model) || '-'
           const text = [
-            'Maintenance acceptance report is attached.',
+            'Maintenance report PDF is attached.',
             `Report No: ${reportNo}`,
             `Request ID: ${record.id}`,
             `Store: ${asText(record.store_name) || asText(record.store_id)}`,
@@ -217,7 +227,7 @@ export async function POST(request: NextRequest) {
                 <p style="margin:0 0 6px 0;"><strong>Completed At:</strong> ${
                   asText(record.completed_at) || issuedAt
                 }</p>
-                <p style="margin:10px 0 0 0;">The attached PDF is your A4 acceptance report.</p>
+                <p style="margin:10px 0 0 0;">The attached PDF is the Maintenance Report (A4).</p>
               </div>
             `,
             attachments: [
@@ -247,15 +257,24 @@ export async function POST(request: NextRequest) {
           report_sent_to: targetEmail || null,
           status: nextStatus,
           updated_at: nowIso,
+          mechanic_report_snapshot: serializeMaintenanceReportForm(mergedReportForm),
         }
         if (nextStatus !== 'completed') {
           patch.completed_at = null
         }
         const supabase = getSupabaseAdmin()
-        const { error: updateError } = await supabase
-          .from('maintenance_requests')
-          .update(patch)
-          .eq('id', requestId)
+        let updateError = (
+          await supabase.from('maintenance_requests').update(patch).eq('id', requestId)
+        ).error
+        if (
+          updateError &&
+          /mechanic_report_snapshot|schema cache|could not find|does not exist/i.test(asErrorMessage(updateError))
+        ) {
+          const { mechanic_report_snapshot: _snap, ...withoutSnap } = patch
+          updateError = (
+            await supabase.from('maintenance_requests').update(withoutSnap).eq('id', requestId)
+          ).error
+        }
         if (updateError) throw updateError
 
         if (nextStatus !== currentStatus) {

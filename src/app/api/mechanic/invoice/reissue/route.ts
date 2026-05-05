@@ -7,6 +7,8 @@ import {
   tryDownloadArchivedPdf,
   uploadArchivedPdf,
 } from '@/lib/documentArchiveStorage'
+import { buildMaintenanceReportFormState } from '@/lib/maintenanceReportForm'
+import { getPublicSiteUrl } from '@/lib/siteUrl'
 
 export const runtime = 'nodejs'
 
@@ -96,6 +98,8 @@ export async function GET(request: NextRequest) {
       return date.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })
     })()
     const invoiceWorkDescription = asText(record.invoice_work_description)
+    const mergedReportForm = buildMaintenanceReportFormState(record, record.mechanic_report_snapshot ?? undefined)
+    const footerSiteUrl = getPublicSiteUrl()
 
     const pdfBuffer = useInvoice
       ? await buildMechanicWorkReportPdf({
@@ -105,11 +109,15 @@ export async function GET(request: NextRequest) {
           reportTitle: 'INVOICE',
           invoiceAmount: invoiceAmount ?? undefined,
           invoiceWorkDescription,
+          maintenanceReport: mergedReportForm,
+          footerSiteUrl,
         })
       : await buildMechanicWorkReportPdf({
           request: record,
           reportNo,
           issuedAtText,
+          maintenanceReport: mergedReportForm,
+          footerSiteUrl,
         })
     try {
       await uploadArchivedPdf({

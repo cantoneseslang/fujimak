@@ -217,18 +217,24 @@ async function persistMedia(params: {
   requestId: string
   phase: 'before' | 'after'
   media: IncomingMedia[]
-}) {
+}): Promise<{ saved: MaintenanceAttachmentPayload[]; error?: string }> {
   const { supabase, bucketName, requestId, phase, media } = params
   const safeMedia = media.slice(0, 8)
   const saved: MaintenanceAttachmentPayload[] = []
+  const failures: string[] = []
 
   for (let i = 0; i < safeMedia.length; i++) {
     const item = safeMedia[i]
     if (!item) continue
     try {
       const bytes = item.bytes
-      // Protect route from unexpectedly huge payloads.
-      if (bytes.byteLength > WORK_MEDIA_MAX_FILE_BYTES) continue
+      const label = `${phase} file #${i + 1}`
+      if (bytes.byteLength > WORK_MEDIA_MAX_FILE_BYTES) {
+        failures.push(
+          `${label}: skipped (${bytes.byteLength} bytes > route max ${WORK_MEDIA_MAX_FILE_BYTES} bytes)`
+        )
+        continue
+      }
 
       const ext = pickExt(item.mimeType)
       const objectPath = `${requestId}/${phase}/${Date.now()}_${i}.${ext}`
@@ -236,10 +242,16 @@ async function persistMedia(params: {
         contentType: item.mimeType,
         upsert: false,
       })
-      if (uploadError) continue
+      if (uploadError) {
+        failures.push(`${label} (${bytes.byteLength} bytes): ${uploadError.message}`)
+        continue
+      }
 
       const { data } = supabase.storage.from(bucketName).getPublicUrl(objectPath)
-      if (!data?.publicUrl) continue
+      if (!data?.publicUrl) {
+        failures.push(`${label}: no public URL returned after upload`)
+        continue
+      }
 
       saved.push({
         name: item.name || `${phase}_${i + 1}`,
@@ -247,12 +259,23 @@ async function persistMedia(params: {
         source: `mechanic_${phase}`,
         url: data.publicUrl,
       })
-    } catch {
-      // Skip invalid attachment and continue the rest.
+    } catch (err) {
+      failures.push(`${phase} file #${i + 1}: ${asErrorMessage(err)}`)
     }
   }
 
-  return saved
+  if (safeMedia.length > 0 && saved.length === 0) {
+    return {
+      saved: [],
+      error: [
+        `Could not save any ${phase} media to Storage bucket "${bucketName}".`,
+        failures.length > 0 ? failures.join(' · ') : 'No detailed errors (check bucket policies and Storage limits in Supabase).',
+        'Note: Supabase may report "maximum allowed size" even when your file is small if the bucket/global Storage limit is misconfigured.',
+      ].join(' '),
+    }
+  }
+
+  return { saved }
 }
 
 export async function POST(request: NextRequest) {
@@ -315,6 +338,9 @@ export async function POST(request: NextRequest) {
       phase: 'before',
       media: beforeMedia,
     })
+    if (uploadedBefore.error) {
+      return NextResponse.json({ error: uploadedBefore.error }, { status: 422 })
+    }
     const uploadedAfter = await persistMedia({
       supabase,
       bucketName,
@@ -322,9 +348,12 @@ export async function POST(request: NextRequest) {
       phase: 'after',
       media: afterMedia,
     })
+    if (uploadedAfter.error) {
+      return NextResponse.json({ error: uploadedAfter.error }, { status: 422 })
+    }
 
     const existingAttachments = parseAttachmentArray(current.attachments)
-    const mergedAttachments = [...existingAttachments, ...uploadedBefore, ...uploadedAfter]
+    const mergedAttachments = [...existingAttachments, ...uploadedBefore.saved, ...uploadedAfter.saved]
 
     const recordedAt = new Date().toISOString()
     const currentStatus = asText(current.status)
@@ -341,8 +370,8 @@ export async function POST(request: NextRequest) {
       `RecordedAt: ${recordedAt}`,
       recordType === 'start' ? `WorkStartedAt: ${recordedAt}` : '',
       `Status: ${nextStatus}`,
-      `BeforeCount: ${uploadedBefore.length}`,
-      `AfterCount: ${uploadedAfter.length}`,
+      `BeforeCount: ${uploadedBefore.saved.length}`,
+      `AfterCount: ${uploadedAfter.saved.length}`,
       `Comment: ${comment || '-'}`,
     ]
       .filter((line) => line.length > 0)
@@ -387,8 +416,8 @@ export async function POST(request: NextRequest) {
       recordedAt,
       recordType,
       uploaded: {
-        before: uploadedBefore.length,
-        after: uploadedAfter.length,
+        before: uploadedBefore.saved.length,
+        after: uploadedAfter.saved.length,
       },
     })
   } catch (error) {

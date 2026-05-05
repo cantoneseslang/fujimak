@@ -182,7 +182,7 @@ export async function buildMechanicWorkReportPdf(params: {
     doc.moveDown(0.2)
   }
 
-  /** Matches report-confirm preview: two-column pairs + Symptom row (operation date only in header band). */
+  /** Header grid: two-column pairs; last row Symptom | FOR (Warranty / Billing). */
   const drawHeaderTwoColumnGrid = () => {
     const colGap = 16
     const halfW = (contentW - colGap) / 2
@@ -192,6 +192,7 @@ export async function buildMechanicWorkReportPdf(params: {
       [['Machine', form.equipmentLabel], ['Model', form.brand]],
       [['Serial', form.serialNumber], ['Start Time', form.startTimeDisplay]],
       [['Finish Time', form.finishTimeDisplay], ['Form code', asText(form.formCode) || 'FPC011']],
+      [['Symptom', asText(request.symptom) || '—'], ['FOR', form.forBilling === 'warranty' ? 'Warranty' : 'Billing']],
     ]
 
     const measureStackedCell = (label: string, rawValue: string, cellW: number) => {
@@ -232,25 +233,6 @@ export async function buildMechanicWorkReportPdf(params: {
       doc.y = rowTop + rowH
       doc.fillColor('#111111')
     }
-
-    const symLabel = 'Symptom'
-    const symVal = asText(request.symptom) || '—'
-    doc.font('Helvetica').fontSize(7).fillColor('#64748b')
-    const slh = doc.heightOfString(`${symLabel}:`, { width: contentW })
-    doc.font('Helvetica').fontSize(8.5).fillColor('#111111')
-    const svh = doc.heightOfString(symVal, { width: contentW })
-    const symRowH = slh + 2 + svh + 10
-
-    ensureSpace(symRowH + 6)
-    const symTop = doc.y
-    doc.font('Helvetica').fontSize(7).fillColor('#64748b')
-    doc.text(`${symLabel}:`, marginLeft, symTop, { width: contentW })
-    doc.font('Helvetica').fontSize(8.5).fillColor('#111111')
-    doc.text(symVal, marginLeft, symTop + slh + 2, { width: contentW })
-    const symLineY = symTop + symRowH - 4
-    doc.moveTo(marginLeft, symLineY).lineTo(marginRight, symLineY).strokeColor('#e5e7eb').lineWidth(0.55).stroke()
-    doc.y = symTop + symRowH
-    doc.fillColor('#111111')
 
     doc.moveDown(0.25)
   }
@@ -408,13 +390,6 @@ export async function buildMechanicWorkReportPdf(params: {
 
   // 1. Same pairing / order as report-confirm “More header fields” (two-column grid)
   drawHeaderTwoColumnGrid()
-
-  // 2. FOR — show selected classification only (Warranty XOR Billing)
-  doc.font('Helvetica-Bold').fontSize(9).text('FOR')
-  doc.moveDown(0.3)
-  doc.font('Helvetica-Bold').fontSize(9).text(form.forBilling === 'warranty' ? 'Warranty' : 'Billing')
-  doc.fillColor('#111111')
-  doc.moveDown(0.4)
 
   if (form.forBilling === 'billing') {
     drawLabelValueRows([['If For Billing (note)', form.billingNote || '—']])

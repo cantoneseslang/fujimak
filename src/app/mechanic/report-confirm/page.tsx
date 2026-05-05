@@ -14,6 +14,7 @@ import {
   defaultMaintenanceReportForm,
   normalizeMaintenanceChecklistComments,
   parseMaintenanceRank,
+  rankLabel,
   type MaintenanceReportFormSnapshot,
   buildMaintenanceReportFormState,
 } from '@/lib/maintenanceReportForm'
@@ -863,6 +864,104 @@ export default function MechanicReportConfirmPage() {
                 <p style={{ marginLeft: '6px' }}>
                   <span className="font-semibold">Symptom:</span> {record.symptom || '-'}
                 </p>
+              </div>
+
+              {/* Printed report body — PDF order; no collapsible summary/details in this preview */}
+              <div className="mb-4 space-y-3 text-sm text-zinc-700" style={{ marginLeft: '6px', width: 'calc(100% - 6px)' }}>
+                <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+                  <p className="mb-2 font-semibold text-zinc-900">More header fields (client / dates / equipment)</p>
+                  <dl className="grid gap-2 text-xs sm:grid-cols-2">
+                    {(
+                      [
+                        ['Client', reportForm.clientLabel],
+                        ['PIC', reportForm.picName],
+                        ['Location', reportForm.locationText],
+                        ['Machine', reportForm.equipmentLabel],
+                        ['Model', reportForm.brand],
+                        ['Serial', reportForm.serialNumber],
+                        ['Start Time', reportForm.startTimeDisplay],
+                        ['Finish Time', reportForm.finishTimeDisplay],
+                        ['Form code', reportForm.formCode],
+                        ['Operation date (printed)', reportForm.operationDateText],
+                      ] as const
+                    ).map(([label, value]) => (
+                      <div key={label} className="border-b border-zinc-200/80 pb-1.5">
+                        <dt className="font-medium text-zinc-600">{label}</dt>
+                        <dd className="mt-0.5 text-zinc-800">{asText(value) || '—'}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+
+                <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+                  <p className="mb-2 font-semibold text-zinc-900">FOR</p>
+                  <dl className="grid gap-2 text-xs sm:grid-cols-2">
+                    <div className="border-b border-zinc-200/80 pb-1.5">
+                      <dt className="font-medium text-zinc-600">Warranty</dt>
+                      <dd className="mt-0.5 text-zinc-800">{reportForm.forBilling === 'warranty' ? 'Yes' : '—'}</dd>
+                    </div>
+                    <div className="border-b border-zinc-200/80 pb-1.5">
+                      <dt className="font-medium text-zinc-600">Billing</dt>
+                      <dd className="mt-0.5 text-zinc-800">{reportForm.forBilling === 'billing' ? 'Yes' : '—'}</dd>
+                    </div>
+                    <div className="border-b border-zinc-200/80 pb-1.5 sm:col-span-2">
+                      <dt className="font-medium text-zinc-600">If For Billing (note)</dt>
+                      <dd className="mt-0.5 whitespace-pre-wrap text-zinc-800">{asText(reportForm.billingNote) || '—'}</dd>
+                    </div>
+                  </dl>
+                  <div className="mt-3 space-y-2 border-t border-zinc-200 pt-3 text-xs">
+                    <div>
+                      <p className="font-semibold text-zinc-800">{tm('concernLabel')}</p>
+                      <p className="mt-1 whitespace-pre-wrap text-zinc-700">{asText(reportForm.concern) || '—'}</p>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-zinc-800">Action taken</p>
+                      <p className="mt-1 whitespace-pre-wrap text-zinc-700">{asText(reportForm.actionTaken) || '—'}</p>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-zinc-800">Finish (Status F)</p>
+                      <p className="mt-1 text-zinc-700">{asText(reportForm.statusF) || '—'}</p>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-zinc-800">Recommendation</p>
+                      <p className="mt-1 whitespace-pre-wrap text-zinc-700">{asText(reportForm.recommendation) || '—'}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+                  <p className="mb-2 font-semibold text-zinc-900">Technical checklist comments</p>
+                  <ul className="space-y-2 text-xs">
+                    {MAINTENANCE_CHECKLIST_LABELS.map((label, idx) => (
+                      <li key={label} className="border-b border-zinc-200/80 pb-2 last:border-0">
+                        <span className="font-semibold text-zinc-700">
+                          {idx + 1}. {label}
+                        </span>
+                        <span className="mt-0.5 block text-zinc-800">
+                          {asText(reportForm.checklistComments[idx]) || 'NA'}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+                  <p className="mb-2 font-semibold text-zinc-900">Ranking</p>
+                  <div className="space-y-2 text-xs text-zinc-800">
+                    <p>
+                      <span className="font-semibold text-zinc-700">Rank: </span>
+                      {reportForm.rank} — {rankLabel(reportForm.rank)}
+                    </p>
+                    <p>
+                      <span className="font-semibold text-zinc-700">Condition: </span>
+                      {reportForm.conditionLevel === 'dangerous'
+                        ? '× DANGEROUS — stop using'
+                        : reportForm.conditionLevel === 'not_good'
+                          ? 'Δ Not good (parts needed)'
+                          : 'O Perfect'}
+                    </p>
+                  </div>
+                </div>
               </div>
 
               <div

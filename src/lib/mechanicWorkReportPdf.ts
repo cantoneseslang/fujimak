@@ -161,9 +161,11 @@ export async function buildMechanicWorkReportPdf(params: {
     doc.text(`Operation Date: ${form.operationDateText}`, metaX, bandTop, { width: 140, align: 'right' })
     doc.text(`Report No: ${reportNo}`, metaX, bandTop + 11, { width: 140, align: 'right' })
     doc.text(`Issued: ${issuedAtText}`, metaX, bandTop + 22, { width: 140, align: 'right' })
+    const statusFDisp = asText(form.statusF) || '-'
+    doc.text(`Finish (Status F): ${statusFDisp}`, metaX, bandTop + 33, { width: 140, align: 'right' })
     doc.fillColor('#111111')
 
-    doc.y = bandTop + Math.max(logoH, 38)
+    doc.y = bandTop + Math.max(logoH, 48)
     doc.moveDown(0.35)
     doc.x = marginLeft
   }
@@ -449,7 +451,6 @@ export async function buildMechanicWorkReportPdf(params: {
 
   drawBoxParagraph('Concern', form.concern, 44 - 12)
   drawBoxParagraph('Action Taken', form.actionTaken, 52 - 12)
-  drawLabelValueRows([['Finish (Status F)', form.statusF]])
   drawBoxParagraph('Recommendation', form.recommendation, 40 - 12)
 
   // 3. Technical checklist — 4. Ranking

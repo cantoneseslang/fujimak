@@ -815,6 +815,10 @@ export default function MechanicReportConfirmPage() {
                   <div className="inline-flex rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-600">
                     {new Date().toLocaleString()}
                   </div>
+                  <p className="max-w-[min(100%,14rem)] text-right text-xs font-medium text-zinc-700">
+                    Finish (Status F):{' '}
+                    <span className="font-normal text-zinc-600">{asText(reportForm.statusF) || '-'}</span>
+                  </p>
                 </div>
               </div>
 
@@ -872,10 +876,6 @@ export default function MechanicReportConfirmPage() {
                     <div>
                       <p className="font-semibold text-zinc-800">Action taken</p>
                       <p className="mt-1 whitespace-pre-wrap text-zinc-700">{asText(reportForm.actionTaken) || '—'}</p>
-                    </div>
-                    <div>
-                      <p className="font-semibold text-zinc-800">Finish (Status F)</p>
-                      <p className="mt-1 text-zinc-700">{asText(reportForm.statusF) || '—'}</p>
                     </div>
                     <div>
                       <p className="font-semibold text-zinc-800">Recommendation</p>

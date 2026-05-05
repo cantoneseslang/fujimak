@@ -51,15 +51,6 @@ function asErrorMessage(error: unknown) {
   }
 }
 
-function asNumber(value: unknown) {
-  if (typeof value === 'number' && Number.isFinite(value)) return value
-  if (typeof value === 'string') {
-    const parsed = Number(value)
-    if (Number.isFinite(parsed)) return parsed
-  }
-  return null
-}
-
 function parseBytesLimitText(text: string) {
   const normalized = text.trim().toUpperCase()
   const matched = normalized.match(/^(\d+(?:\.\d+)?)\s*(B|KB|MB|GB)$/)
@@ -160,55 +151,39 @@ function parseAttachmentArray(value: unknown): MaintenanceAttachmentPayload[] {
   return parsed
 }
 
+/** Supabase API はバイト数のほうが確実（文字列 "200MB" が環境によって無視されると上限 0 扱いになり得る） */
+function desiredWorkMediaBucketLimitBytes(): number {
+  const parsed = parseBytesLimitText(String(WORK_MEDIA_BUCKET_FILE_SIZE_LIMIT).trim())
+  if (parsed !== null && parsed > 0) return parsed
+  return 209_715_200 // 200 MiB
+}
+
 async function ensureWorkMediaBucket(supabase: ReturnType<typeof getSupabaseAdmin>) {
   const bucketName = 'maintenance-work-media'
-  const { data: bucketData, error: bucketError } = await supabase.storage.getBucket(bucketName)
-  if (!bucketError) {
-    const row = (bucketData ?? {}) as {
-      public?: unknown
-      file_size_limit?: unknown
-      fileSizeLimit?: unknown
-      allowed_mime_types?: unknown
-      allowedMimeTypes?: unknown
-    }
-    const currentLimitBytes = asNumber(row.file_size_limit ?? row.fileSizeLimit)
-    const desiredLimitBytes = parseBytesLimitText(WORK_MEDIA_BUCKET_FILE_SIZE_LIMIT)
-    const currentMimeTypesRaw = row.allowed_mime_types ?? row.allowedMimeTypes
-    const currentMimeTypes = Array.isArray(currentMimeTypesRaw)
-      ? currentMimeTypesRaw.filter((value): value is string => typeof value === 'string')
-      : []
-    const hasImageMime = currentMimeTypes.includes('image/*')
-    const hasVideoMime = currentMimeTypes.includes('video/*')
-    const shouldUpdateBucket =
-      row.public !== true ||
-      !hasImageMime ||
-      !hasVideoMime ||
-      (desiredLimitBytes !== null &&
-        (currentLimitBytes === null || currentLimitBytes < desiredLimitBytes))
+  const limitBytes = desiredWorkMediaBucketLimitBytes()
 
-    if (shouldUpdateBucket) {
-      const { error: updateError } = await supabase.storage.updateBucket(bucketName, {
-        public: true,
-        fileSizeLimit: WORK_MEDIA_BUCKET_FILE_SIZE_LIMIT,
-        allowedMimeTypes: WORK_MEDIA_ALLOWED_MIME_TYPES,
-      })
-      if (updateError) throw updateError
-    }
-    return bucketName
-  }
+  const { error: bucketError } = await supabase.storage.getBucket(bucketName)
+  const message = typeof bucketError?.message === 'string' ? bucketError.message : ''
 
-  const message = (bucketError as { message?: unknown })?.message
-  if (typeof message === 'string' && /not found|does not exist/i.test(message)) {
+  if (bucketError && /not found|does not exist/i.test(message)) {
     const { error: createError } = await supabase.storage.createBucket(bucketName, {
       public: true,
-      fileSizeLimit: WORK_MEDIA_BUCKET_FILE_SIZE_LIMIT,
+      fileSizeLimit: limitBytes,
       allowedMimeTypes: WORK_MEDIA_ALLOWED_MIME_TYPES,
     })
     if (createError) throw createError
-    return bucketName
+  } else if (bucketError) {
+    throw bucketError
   }
 
-  throw bucketError
+  const { error: updateError } = await supabase.storage.updateBucket(bucketName, {
+    public: true,
+    fileSizeLimit: limitBytes,
+    allowedMimeTypes: WORK_MEDIA_ALLOWED_MIME_TYPES,
+  })
+  if (updateError) throw updateError
+
+  return bucketName
 }
 
 async function persistMedia(params: {

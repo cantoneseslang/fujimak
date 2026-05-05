@@ -127,7 +127,11 @@ export default function MechanicPage() {
   const workRecordUploadErrorMessage = (res: Response, json: { error?: string }) => {
     if (res.status === 413) return t('uploadTooLargeHint')
     const err = json.error ?? ''
-    if (/maximum allowed size|request entity too large|payload too large/i.test(err)) return t('uploadTooLargeHint')
+    if (/request entity too large|payload too large/i.test(err)) return t('uploadTooLargeHint')
+    // Supabase が「maximum allowed size」を返しても、写真が小さいときはバケット/プロジェクト側上限の不整合が原因のことが多い
+    if (/maximum allowed size/i.test(err)) {
+      return `${t('storageMaxSizeMisconfiguredHint')}\n${err}`
+    }
     return err.length > 0 ? err : t('saveFailed')
   }
 

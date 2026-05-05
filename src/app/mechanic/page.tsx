@@ -13,7 +13,16 @@ import {
   type MaintenanceRequestRecord,
 } from '@/lib/maintenance'
 import type { ForBillingOption } from '@/lib/maintenanceReportForm'
+import {
+  MAINTENANCE_CHECKLIST_LABELS,
+  MAINTENANCE_CHECKLIST_COMMENT_MAX,
+  defaultMaintenanceReportForm,
+  normalizeMaintenanceChecklistComments,
+  parseMaintenanceRank,
+  type MaintenanceReportFormSnapshot,
+} from '@/lib/maintenanceReportForm'
 import { loadMechanicReportDraft, saveMechanicReportDraft } from '@/lib/mechanicReportDraft'
+import RankWheelPicker from '@/components/RankWheelPicker'
 
 type LocalMedia = {
   id: string
@@ -125,6 +134,10 @@ export default function MechanicPage() {
   const [forBilling, setForBilling] = useState<ForBillingOption>('billing')
   const [billingNote, setBillingNote] = useState('')
   const [concern, setConcern] = useState('')
+  const [checklistComments, setChecklistComments] = useState<string[]>(
+    () => defaultMaintenanceReportForm().checklistComments
+  )
+  const [maintenanceRank, setMaintenanceRank] = useState<MaintenanceReportFormSnapshot['rank']>('A')
   const [customerEmail, setCustomerEmail] = useState('')
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -213,6 +226,8 @@ export default function MechanicPage() {
       setForBilling('billing')
       setBillingNote('')
       setConcern('')
+      setChecklistComments(defaultMaintenanceReportForm().checklistComments)
+      setMaintenanceRank('A')
       setCustomerEmail('')
       setWorkStartSavedAt(null)
     }
@@ -227,11 +242,15 @@ export default function MechanicPage() {
       setForBilling(draft.forBilling)
       setBillingNote(draft.billingNote)
       setConcern(draft.concern)
+      setChecklistComments(normalizeMaintenanceChecklistComments(draft.checklistComments))
+      setMaintenanceRank(parseMaintenanceRank(draft.rank))
       return
     }
     setForBilling('billing')
     setBillingNote('')
     setConcern(selectedRequest.symptom ?? '')
+    setChecklistComments(defaultMaintenanceReportForm().checklistComments)
+    setMaintenanceRank('A')
   }, [selectedRequest?.id])
 
   useEffect(() => {
@@ -243,10 +262,12 @@ export default function MechanicPage() {
         forBilling,
         billingNote,
         concern,
+        checklistComments,
+        rank: maintenanceRank,
       })
     }, 350)
     return () => window.clearTimeout(handle)
-  }, [selectedRequest?.id, forBilling, billingNote, concern])
+  }, [selectedRequest?.id, forBilling, billingNote, concern, checklistComments, maintenanceRank])
   useEffect(() => {
     if (!selectedRequestId) {
       setCustomerEmail('')
@@ -325,6 +346,8 @@ export default function MechanicPage() {
     setForBilling('billing')
     setBillingNote('')
     setConcern('')
+    setChecklistComments(defaultMaintenanceReportForm().checklistComments)
+    setMaintenanceRank('A')
     setCustomerEmail('')
     setWorkStartSavedAt(null)
     setError(null)
@@ -516,6 +539,8 @@ export default function MechanicPage() {
             forBilling,
             billingNote,
             concern,
+            checklistComments,
+            rank: maintenanceRank,
           })
           router.push(`/mechanic/report-confirm?${params.toString()}`)
         }
@@ -571,6 +596,8 @@ export default function MechanicPage() {
         forBilling,
         billingNote,
         concern,
+        checklistComments,
+        rank: maintenanceRank,
       })
       router.push(`/mechanic/report-confirm?${params.toString()}`)
     } catch (error) {
@@ -584,7 +611,7 @@ export default function MechanicPage() {
     <div className="min-h-screen bg-gray-50">
       <Header showBack title={t('title')} onRightButtonTripleClick={openModeConfirmDialog} />
 
-      <main className="px-4 py-6 space-y-4" style={{ paddingBottom: '380px' }}>
+      <main className="px-4 py-6 space-y-4" style={{ paddingBottom: '520px' }}>
         <section className="rounded-xl bg-white p-4 shadow-sm">
           <p className="text-sm text-gray-600" style={{ marginLeft: '6px' }}>{subtitle}</p>
           <p className="mt-1 text-xs font-semibold text-zinc-700" style={{ marginLeft: '6px' }}>
@@ -718,6 +745,8 @@ export default function MechanicPage() {
                         setForBilling('billing')
                         setBillingNote('')
                         setConcern('')
+                        setChecklistComments(defaultMaintenanceReportForm().checklistComments)
+                        setMaintenanceRank('A')
                         setCustomerEmail('')
                         setWorkStartSavedAt(null)
                         setMessage(null)
@@ -901,6 +930,77 @@ export default function MechanicPage() {
                       />
                     </label>
                     <p className="text-xs text-gray-500">{t('reportDraftHint')}</p>
+
+                    <div className="mt-3 border-t border-zinc-200 pt-3 space-y-3">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">{t('technicalChecklistTitle')}</p>
+                        <p className="mt-1 text-xs text-gray-500">{t('technicalChecklistHint')}</p>
+                      </div>
+                      <div className="flex flex-col gap-3">
+                        {MAINTENANCE_CHECKLIST_LABELS.map((label, idx) => {
+                          const stored = checklistComments[idx] ?? 'NA'
+                          const isNaChoice = stored === 'NA'
+                          return (
+                            <div key={label} className="rounded-lg border border-gray-200 bg-white p-2.5 shadow-sm">
+                              <div className="flex flex-wrap items-start gap-2">
+                                <p className="min-w-0 flex-1 text-xs font-medium text-gray-800">
+                                  <span className="font-semibold text-gray-600">{idx + 1}.</span> {label}
+                                </p>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setChecklistComments((prev) => {
+                                      const next = [...prev]
+                                      next[idx] = 'NA'
+                                      return next
+                                    })
+                                  }
+                                  className={`shrink-0 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                                    isNaChoice
+                                      ? 'border-red-600 bg-red-600 text-white'
+                                      : 'border-gray-300 bg-gray-50 text-gray-700'
+                                  }`}
+                                >
+                                  NA
+                                </button>
+                              </div>
+                              <input
+                                type="text"
+                                value={isNaChoice ? '' : stored}
+                                placeholder={isNaChoice ? 'NA' : 'Comment'}
+                                onChange={(event) => {
+                                  const v = event.target.value.slice(0, MAINTENANCE_CHECKLIST_COMMENT_MAX)
+                                  setChecklistComments((prev) => {
+                                    const next = [...prev]
+                                    next[idx] = v
+                                    return next
+                                  })
+                                }}
+                                onBlur={() =>
+                                  setChecklistComments((prev) => {
+                                    const next = [...prev]
+                                    const cur = (next[idx] ?? '').trim()
+                                    next[idx] = cur === '' ? 'NA' : cur.slice(0, MAINTENANCE_CHECKLIST_COMMENT_MAX)
+                                    return next
+                                  })
+                                }
+                                className="mt-2 w-full rounded-lg border border-gray-200 px-2 py-2 text-sm"
+                              />
+                            </div>
+                          )
+                        })}
+                      </div>
+                      <div className="space-y-2">
+                        <p id="mechanic-rank-label" className="text-sm font-semibold text-gray-900">
+                          {t('rankingTitle')}
+                        </p>
+                        <RankWheelPicker
+                          ariaLabelledBy="mechanic-rank-label"
+                          value={maintenanceRank}
+                          onChange={(rank) => setMaintenanceRank(rank)}
+                        />
+                      </div>
+                    </div>
                   </div>
 
                   <div className="space-y-2">

@@ -64,10 +64,14 @@ function asText(value: unknown) {
   return typeof value === 'string' ? value.trim() : ''
 }
 
-function pickRank(value: unknown): MaintenanceReportFormSnapshot['rank'] {
+export function parseMaintenanceRank(value: unknown): MaintenanceReportFormSnapshot['rank'] {
   const t = asText(value).toUpperCase()
   if (t === 'A' || t === 'B' || t === 'C' || t === 'D' || t === 'E') return t
   return 'A'
+}
+
+function pickRank(value: unknown): MaintenanceReportFormSnapshot['rank'] {
+  return parseMaintenanceRank(value)
 }
 
 function pickCondition(value: unknown): ConditionLevel {
@@ -136,7 +140,7 @@ export function defaultMaintenanceReportForm(): MaintenanceReportFormSnapshot {
   }
 }
 
-function normalizeChecklist(input: unknown): string[] {
+export function normalizeMaintenanceChecklistComments(input: unknown): string[] {
   const base = defaultMaintenanceReportForm().checklistComments
   if (!Array.isArray(input)) return base
   const out = [...base]
@@ -145,6 +149,10 @@ function normalizeChecklist(input: unknown): string[] {
     out[i] = v ? v.slice(0, MAX_COMMENT_LEN) : 'NA'
   }
   return out
+}
+
+function normalizeChecklist(input: unknown): string[] {
+  return normalizeMaintenanceChecklistComments(input)
 }
 
 /** Merge DB snapshot / API partial with defaults and inferred values from maintenance_requests */

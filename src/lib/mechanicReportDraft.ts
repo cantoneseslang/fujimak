@@ -1,4 +1,5 @@
 import type { ForBillingOption } from '@/lib/maintenanceReportForm'
+import { normalizeMaintenanceChecklistComments, parseMaintenanceRank } from '@/lib/maintenanceReportForm'
 
 const STORAGE_KEY = 'mechanic-maintenance-report-draft-v1'
 
@@ -7,6 +8,10 @@ export type MechanicReportDraft = {
   forBilling: ForBillingOption
   billingNote: string
   concern: string
+  /** Parallel to MaintenanceReportFormSnapshot.checklistComments */
+  checklistComments?: string[]
+  /** A–E */
+  rank?: string
 }
 
 export function saveMechanicReportDraft(payload: MechanicReportDraft) {
@@ -31,6 +36,8 @@ export function loadMechanicReportDraft(requestId: string): MechanicReportDraft 
       forBilling,
       billingNote: typeof parsed.billingNote === 'string' ? parsed.billingNote : '',
       concern: typeof parsed.concern === 'string' ? parsed.concern : '',
+      checklistComments: normalizeMaintenanceChecklistComments(parsed.checklistComments),
+      rank: parseMaintenanceRank(parsed.rank),
     }
   } catch {
     return null

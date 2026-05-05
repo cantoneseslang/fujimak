@@ -12,6 +12,8 @@ import {
   MAINTENANCE_CHECKLIST_LABELS,
   MAINTENANCE_CHECKLIST_COMMENT_MAX,
   defaultMaintenanceReportForm,
+  normalizeMaintenanceChecklistComments,
+  parseMaintenanceRank,
   type MaintenanceReportFormSnapshot,
   buildMaintenanceReportFormState,
 } from '@/lib/maintenanceReportForm'
@@ -257,6 +259,8 @@ export default function MechanicReportConfirmPage() {
       forBilling: draft.forBilling,
       billingNote: draft.billingNote,
       concern: draft.concern,
+      checklistComments: normalizeMaintenanceChecklistComments(draft.checklistComments ?? base.checklistComments),
+      rank: parseMaintenanceRank(draft.rank ?? base.rank),
     })
   }, [record])
 

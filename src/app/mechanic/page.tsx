@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { Camera, PlayCircle, Wrench, X } from 'lucide-react'
+import { Camera, Images, PlayCircle, Wrench, X } from 'lucide-react'
 import Header from '@/components/Header'
 import BottomNav from '@/components/BottomNav'
 import {
@@ -22,6 +22,8 @@ import {
   type MaintenanceReportFormSnapshot,
 } from '@/lib/maintenanceReportForm'
 import { loadMechanicReportDraft, saveMechanicReportDraft } from '@/lib/mechanicReportDraft'
+import { compressImageForMechanicUpload } from '@/lib/compressMechanicPhoto'
+import { postMechanicWorkRecordChunks } from '@/lib/mechanicWorkRecordUpload'
 import RankWheelPicker from '@/components/RankWheelPicker'
 
 type LocalMedia = {
@@ -38,6 +40,8 @@ const MECHANIC_OPERATION_MODE_KEY = 'mechanic-operation-mode-v1'
 const MECHANIC_PROFILE_KEY = 'mechanic-board-profile-v1'
 const MAX_MEDIA_FILE_MB = 120
 const MAX_MEDIA_FILE_BYTES = MAX_MEDIA_FILE_MB * 1024 * 1024
+/** Vercel serverless request body ~4.5MB; keep videos small so multipart stays under limit */
+const MAX_VIDEO_UPLOAD_BYTES = Math.floor(3.5 * 1024 * 1024)
 
 function toLocalMedia(file: File, dataUrl: string): LocalMedia {
   return {
@@ -120,6 +124,13 @@ export default function MechanicPage() {
     }
   }
 
+  const workRecordUploadErrorMessage = (res: Response, json: { error?: string }) => {
+    if (res.status === 413) return t('uploadTooLargeHint')
+    const err = json.error ?? ''
+    if (/maximum allowed size|request entity too large|payload too large/i.test(err)) return t('uploadTooLargeHint')
+    return err.length > 0 ? err : t('saveFailed')
+  }
+
   const [loading, setLoading] = useState(true)
   const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null)
   const [requests, setRequests] = useState<MaintenanceRequestRecord[]>([])
@@ -146,8 +157,10 @@ export default function MechanicPage() {
   const [activeMechanicId, setActiveMechanicId] = useState('')
   const [activeMechanicName, setActiveMechanicName] = useState('')
 
-  const beforeInputRef = useRef<HTMLInputElement>(null)
-  const afterInputRef = useRef<HTMLInputElement>(null)
+  const beforeGalleryInputRef = useRef<HTMLInputElement>(null)
+  const beforeCameraInputRef = useRef<HTMLInputElement>(null)
+  const afterGalleryInputRef = useRef<HTMLInputElement>(null)
+  const afterCameraInputRef = useRef<HTMLInputElement>(null)
   const commentRef = useRef<HTMLTextAreaElement>(null)
   const modeDialogAutoCloseTimerRef = useRef<number | null>(null)
 
@@ -366,7 +379,22 @@ export default function MechanicPage() {
     for (const file of Array.from(files)) {
       if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) continue
       if (target === 'before' && !file.type.startsWith('image/')) continue
-      if (file.size > MAX_MEDIA_FILE_BYTES) {
+
+      if (file.type.startsWith('video/') && file.size > MAX_VIDEO_UPLOAD_BYTES) {
+        setError(t('videoTooLargeForUpload'))
+        continue
+      }
+
+      let workFile = file
+      if (file.type.startsWith('image/')) {
+        try {
+          workFile = await compressImageForMechanicUpload(file)
+        } catch {
+          workFile = file
+        }
+      }
+
+      if (workFile.size > MAX_MEDIA_FILE_BYTES) {
         setError(`File is too large (max ${MAX_MEDIA_FILE_MB}MB each).`)
         continue
       }
@@ -378,11 +406,11 @@ export default function MechanicPage() {
           else reject(new Error('Invalid file data'))
         }
         reader.onerror = () => reject(reader.error ?? new Error('Failed to read file'))
-        reader.readAsDataURL(file)
+        reader.readAsDataURL(workFile)
       }).catch(() => '')
 
       if (!dataUrl) continue
-      accepted.push(toLocalMedia(file, dataUrl))
+      accepted.push(toLocalMedia(workFile, dataUrl))
     }
 
     if (accepted.length === 0) return
@@ -460,26 +488,15 @@ export default function MechanicPage() {
     setError(null)
     setMessage(null)
     try {
-      const formData = new FormData()
-      formData.set('requestId', selectedRequest.id)
-      formData.set('comment', comment.trim())
-      formData.set('markCompleted', 'false')
-      formData.set('recordType', 'start')
-      beforeMedia.forEach((item) => {
-        formData.append('beforeFiles', item.file, item.fileName)
+      const json = await postMechanicWorkRecordChunks({
+        requestId: selectedRequest.id,
+        comment: comment.trim(),
+        markCompleted: false,
+        recordTypeRaw: 'start',
+        beforeMedia,
+        afterMedia: [],
+        mapError: workRecordUploadErrorMessage,
       })
-      const res = await fetch('/api/mechanic/work-record', {
-        method: 'POST',
-        body: formData,
-      })
-      const json = (await res.json()) as {
-        request?: MaintenanceRequestRecord
-        error?: string
-        recordedAt?: string
-      }
-      if (!res.ok || !json.request) {
-        throw new Error(json.error ?? t('saveFailed'))
-      }
 
       setRequests((prev) => prev.map((request) => (request.id === json.request?.id ? json.request : request)))
       setWorkStartSavedAt(json.recordedAt ?? new Date().toISOString())
@@ -553,25 +570,15 @@ export default function MechanicPage() {
     setError(null)
     setMessage(null)
     try {
-      const formData = new FormData()
-      formData.set('requestId', selectedRequest.id)
-      formData.set('comment', comment.trim())
-      formData.set('markCompleted', markCompleted ? 'true' : 'false')
-      formData.set('recordType', markCompleted ? 'complete' : 'progress')
-      beforeMedia.forEach((item) => {
-        formData.append('beforeFiles', item.file, item.fileName)
+      const json = await postMechanicWorkRecordChunks({
+        requestId: selectedRequest.id,
+        comment: comment.trim(),
+        markCompleted,
+        recordTypeRaw: markCompleted ? 'complete' : 'progress',
+        beforeMedia,
+        afterMedia,
+        mapError: workRecordUploadErrorMessage,
       })
-      afterMedia.forEach((item) => {
-        formData.append('afterFiles', item.file, item.fileName)
-      })
-      const res = await fetch('/api/mechanic/work-record', {
-        method: 'POST',
-        body: formData,
-      })
-      const json = (await res.json()) as { request?: MaintenanceRequestRecord; error?: string }
-      if (!res.ok || !json.request) {
-        throw new Error(json.error ?? t('saveFailed'))
-      }
 
       setRequests((prev) => prev.map((request) => (request.id === json.request?.id ? json.request : request)))
       if (!markCompleted) {
@@ -778,13 +785,26 @@ export default function MechanicPage() {
                   <div className="space-y-2">
                     <p className="text-sm font-semibold text-gray-800" style={{ marginLeft: '6px' }}>{t('beforeSectionTitle')}</p>
                     <p className="text-xs text-gray-500" style={{ marginLeft: '6px' }}>{t('beforeHint')}</p>
+                    <p className="text-xs text-gray-500" style={{ marginLeft: '6px' }}>
+                      {t('multiPhotoHint')}
+                    </p>
                     <input
-                      ref={beforeInputRef}
+                      ref={beforeGalleryInputRef}
+                      type="file"
+                      className="hidden"
+                      accept="image/*"
+                      multiple
+                      onChange={(event) => {
+                        void readFiles(event.target.files, 'before')
+                        event.target.value = ''
+                      }}
+                    />
+                    <input
+                      ref={beforeCameraInputRef}
                       type="file"
                       className="hidden"
                       accept="image/*"
                       capture="environment"
-                      multiple
                       onChange={(event) => {
                         void readFiles(event.target.files, 'before')
                         event.target.value = ''
@@ -806,11 +826,19 @@ export default function MechanicPage() {
                       ))}
                       <button
                         type="button"
-                        onClick={() => beforeInputRef.current?.click()}
+                        onClick={() => beforeGalleryInputRef.current?.click()}
+                        className="flex h-24 w-24 flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-gray-300 bg-gray-50 text-xs text-gray-600"
+                      >
+                        <Images className="h-5 w-5" />
+                        <span className="px-1 text-center leading-tight">{t('addMediaGallery')}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => beforeCameraInputRef.current?.click()}
                         className="flex h-24 w-24 flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-gray-300 bg-gray-50 text-xs text-gray-600"
                       >
                         <Camera className="h-5 w-5" />
-                        {t('addBeforeMedia')}
+                        <span className="px-1 text-center leading-tight">{t('addMediaCamera')}</span>
                       </button>
                     </div>
                     <button
@@ -836,12 +864,22 @@ export default function MechanicPage() {
                     <p className="text-sm font-semibold text-gray-800" style={{ marginLeft: '6px' }}>{t('afterSectionTitle')}</p>
                     <p className="text-xs text-gray-500" style={{ marginLeft: '6px' }}>{t('afterHint')}</p>
                     <input
-                      ref={afterInputRef}
+                      ref={afterGalleryInputRef}
+                      type="file"
+                      className="hidden"
+                      accept="image/*,video/*"
+                      multiple
+                      onChange={(event) => {
+                        void readFiles(event.target.files, 'after')
+                        event.target.value = ''
+                      }}
+                    />
+                    <input
+                      ref={afterCameraInputRef}
                       type="file"
                       className="hidden"
                       accept="image/*,video/*"
                       capture="environment"
-                      multiple
                       onChange={(event) => {
                         void readFiles(event.target.files, 'after')
                         event.target.value = ''
@@ -872,11 +910,19 @@ export default function MechanicPage() {
                       ))}
                       <button
                         type="button"
-                        onClick={() => afterInputRef.current?.click()}
+                        onClick={() => afterGalleryInputRef.current?.click()}
+                        className="flex h-24 w-24 flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-gray-300 bg-gray-50 text-xs text-gray-600"
+                      >
+                        <Images className="h-5 w-5" />
+                        <span className="px-1 text-center leading-tight">{t('addMediaGallery')}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => afterCameraInputRef.current?.click()}
                         className="flex h-24 w-24 flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-gray-300 bg-gray-50 text-xs text-gray-600"
                       >
                         <Camera className="h-5 w-5" />
-                        {t('addAfterMedia')}
+                        <span className="px-1 text-center leading-tight">{t('addMediaCamera')}</span>
                       </button>
                     </div>
                   </div>
@@ -892,7 +938,7 @@ export default function MechanicPage() {
                         onClick={() => setForBilling('warranty')}
                         className={`min-h-[44px] flex-1 rounded-xl px-3 text-sm font-semibold shadow-sm transition-colors sm:flex-none sm:min-w-[128px] ${
                           forBilling === 'warranty'
-                            ? 'bg-red-600 text-white'
+                            ? 'border border-emerald-600 bg-emerald-600 text-white shadow-sm'
                             : 'border border-gray-300 bg-white text-gray-800'
                         }`}
                       >
@@ -903,7 +949,7 @@ export default function MechanicPage() {
                         onClick={() => setForBilling('billing')}
                         className={`min-h-[44px] flex-1 rounded-xl px-3 text-sm font-semibold shadow-sm transition-colors sm:flex-none sm:min-w-[128px] ${
                           forBilling === 'billing'
-                            ? 'bg-red-600 text-white'
+                            ? 'border border-red-600 bg-red-600 text-white shadow-sm'
                             : 'border border-gray-300 bg-white text-gray-800'
                         }`}
                       >

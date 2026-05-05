@@ -517,7 +517,7 @@ export default function MechanicReportConfirmPage() {
                       onClick={() => setReportForm((p) => ({ ...p, forBilling: 'warranty' }))}
                       className={`min-h-[44px] flex-1 rounded-xl px-3 text-sm font-semibold shadow-sm transition-colors sm:max-w-[160px] ${
                         reportForm.forBilling === 'warranty'
-                          ? 'bg-red-600 text-white'
+                          ? 'border border-emerald-600 bg-emerald-600 text-white shadow-sm'
                           : 'border border-zinc-300 bg-white text-zinc-800'
                       }`}
                     >
@@ -528,7 +528,7 @@ export default function MechanicReportConfirmPage() {
                       onClick={() => setReportForm((p) => ({ ...p, forBilling: 'billing' }))}
                       className={`min-h-[44px] flex-1 rounded-xl px-3 text-sm font-semibold shadow-sm transition-colors sm:max-w-[160px] ${
                         reportForm.forBilling === 'billing'
-                          ? 'bg-red-600 text-white'
+                          ? 'border border-red-600 bg-red-600 text-white shadow-sm'
                           : 'border border-zinc-300 bg-white text-zinc-800'
                       }`}
                     >

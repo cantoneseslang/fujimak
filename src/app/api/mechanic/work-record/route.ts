@@ -287,6 +287,7 @@ export async function POST(request: NextRequest) {
     let recordTypeRaw = ''
     let beforeMedia: IncomingMedia[] = []
     let afterMedia: IncomingMedia[] = []
+    let mediaAppendOnly = false
 
     if (contentType.includes('multipart/form-data')) {
       const formData = await request.formData()
@@ -294,6 +295,7 @@ export async function POST(request: NextRequest) {
       comment = asText(formData.get('comment'))
       markCompleted = asText(formData.get('markCompleted')).toLowerCase() === 'true'
       recordTypeRaw = asText(formData.get('recordType'))
+      mediaAppendOnly = asText(formData.get('mediaAppendOnly')).toLowerCase() === 'true'
       beforeMedia = await parseMediaListFromFormData(formData, 'beforeFiles', 'before')
       afterMedia = await parseMediaListFromFormData(formData, 'afterFiles', 'after')
     } else {
@@ -302,6 +304,7 @@ export async function POST(request: NextRequest) {
       comment = asText(body?.comment)
       markCompleted = body?.markCompleted === true
       recordTypeRaw = asText(body?.recordType)
+      mediaAppendOnly = body?.mediaAppendOnly === true
       beforeMedia = parseMediaList(body?.beforeMedia)
       afterMedia = parseMediaList(body?.afterMedia)
     }
@@ -315,7 +318,7 @@ export async function POST(request: NextRequest) {
     if (beforeMedia.length === 0 && afterMedia.length === 0 && !comment) {
       return NextResponse.json({ error: 'At least one media or comment is required' }, { status: 400 })
     }
-    if (recordType === 'start' && beforeMedia.length === 0) {
+    if (!mediaAppendOnly && recordType === 'start' && beforeMedia.length === 0) {
       return NextResponse.json({ error: 'Before photo is required to save work start' }, { status: 400 })
     }
 
@@ -365,17 +368,32 @@ export async function POST(request: NextRequest) {
         : markCompleted || recordType === 'complete'
           ? '[Mechanic Work Complete]'
           : '[Mechanic Work Record]'
-    const noteBlock = [
-      noteTitle,
-      `RecordedAt: ${recordedAt}`,
-      recordType === 'start' ? `WorkStartedAt: ${recordedAt}` : '',
-      `Status: ${nextStatus}`,
-      `BeforeCount: ${uploadedBefore.saved.length}`,
-      `AfterCount: ${uploadedAfter.saved.length}`,
-      `Comment: ${comment || '-'}`,
-    ]
-      .filter((line) => line.length > 0)
-      .join('\n')
+
+    const noteBlock = mediaAppendOnly
+      ? markCompleted
+        ? [
+            '[Mechanic Work Complete]',
+            `RecordedAt: ${recordedAt}`,
+            `AppendMedia · Before +${uploadedBefore.saved.length} · After +${uploadedAfter.saved.length}`,
+            ...(comment.trim().length > 0 ? [`Comment: ${comment.trim()}`] : []),
+          ].join('\n')
+        : [
+            '[Mechanic Work Record]',
+            `RecordedAt: ${recordedAt}`,
+            `AppendMedia · Before +${uploadedBefore.saved.length} · After +${uploadedAfter.saved.length}`,
+            ...(comment.trim().length > 0 ? [`Comment: ${comment.trim()}`] : []),
+          ].join('\n')
+      : [
+          noteTitle,
+          `RecordedAt: ${recordedAt}`,
+          recordType === 'start' ? `WorkStartedAt: ${recordedAt}` : '',
+          `Status: ${nextStatus}`,
+          `BeforeCount: ${uploadedBefore.saved.length}`,
+          `AfterCount: ${uploadedAfter.saved.length}`,
+          `Comment: ${comment || '-'}`,
+        ]
+          .filter((line) => line.length > 0)
+          .join('\n')
 
     const currentRemarks = asText(current.remarks)
     const nextRemarks = currentRemarks ? `${currentRemarks}\n\n${noteBlock}` : noteBlock

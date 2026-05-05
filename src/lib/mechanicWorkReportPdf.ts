@@ -192,7 +192,7 @@ export async function buildMechanicWorkReportPdf(params: {
       [['Machine', form.equipmentLabel], ['Model', form.brand]],
       [['Serial', form.serialNumber], ['Form code', asText(form.formCode) || 'FPC011']],
       [['Start Time', form.startTimeDisplay], ['Finish Time', form.finishTimeDisplay]],
-      [['Symptom', asText(request.symptom) || '—'], ['FOR', form.forBilling === 'warranty' ? 'Warranty' : 'Billing']],
+      [['Symptom', asText(request.symptom) || '-'], ['FOR', form.forBilling === 'warranty' ? 'Warranty' : 'Billing']],
     ]
 
     const measureStackedCell = (label: string, rawValue: string, cellW: number) => {

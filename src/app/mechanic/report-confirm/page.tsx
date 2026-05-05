@@ -836,7 +836,7 @@ export default function MechanicReportConfirmPage() {
                         ['Start Time', reportForm.startTimeDisplay],
                         ['Finish Time', reportForm.finishTimeDisplay],
                         ['Operation date (printed)', reportForm.operationDateText],
-                        ['Symptom', asText(record.symptom) || '—'],
+                        ['Symptom', asText(record.symptom) || '-'],
                       ] satisfies ReadonlyArray<readonly [string, string]>
                     ).map(([label, value]) => (
                       <div key={label} className="border-b border-zinc-200/80 pb-1.5">

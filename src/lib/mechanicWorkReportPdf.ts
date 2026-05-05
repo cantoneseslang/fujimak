@@ -190,8 +190,8 @@ export async function buildMechanicWorkReportPdf(params: {
       [['Request ID', request.id], ['Client', form.clientLabel]],
       [['PIC', form.picName], ['Location', form.locationText]],
       [['Machine', form.equipmentLabel], ['Model', form.brand]],
-      [['Serial', form.serialNumber], ['Start Time', form.startTimeDisplay]],
-      [['Finish Time', form.finishTimeDisplay], ['Form code', asText(form.formCode) || 'FPC011']],
+      [['Serial', form.serialNumber], ['Form code', asText(form.formCode) || 'FPC011']],
+      [['Start Time', form.startTimeDisplay], ['Finish Time', form.finishTimeDisplay]],
       [['Symptom', asText(request.symptom) || '—'], ['FOR', form.forBilling === 'warranty' ? 'Warranty' : 'Billing']],
     ]
 

@@ -832,9 +832,9 @@ export default function MechanicReportConfirmPage() {
                         ['Machine', reportForm.equipmentLabel],
                         ['Model', reportForm.brand],
                         ['Serial', reportForm.serialNumber],
+                        ['Form code', reportForm.formCode],
                         ['Start Time', reportForm.startTimeDisplay],
                         ['Finish Time', reportForm.finishTimeDisplay],
-                        ['Form code', reportForm.formCode],
                         ['Operation date (printed)', reportForm.operationDateText],
                         ['Symptom', asText(record.symptom) || '—'],
                       ] satisfies ReadonlyArray<readonly [string, string]>

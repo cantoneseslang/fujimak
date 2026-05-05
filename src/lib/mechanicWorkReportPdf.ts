@@ -556,11 +556,12 @@ export async function buildMechanicWorkReportPdf(params: {
     x: number,
     y: number,
     w: number,
-    h: number
+    h: number,
+    opts?: { emptySigHint?: string }
   ) => {
     doc.rect(x, y, w, h).strokeColor('#d4d4d8').lineWidth(0.8).stroke()
     doc.font('Helvetica-Bold').fontSize(8).text(title, x + 6, y + 4)
-    doc.font('Helvetica').fontSize(8).text(name || '-', x + 6, y + 15)
+    doc.font('Helvetica').fontSize(8).fillColor('#111111').text(name || '-', x + 6, y + 15)
     const buf = sigUrl ? await imageBufferFromUrl(asText(sigUrl)) : null
     if (buf) {
       try {
@@ -568,6 +569,11 @@ export async function buildMechanicWorkReportPdf(params: {
       } catch {
         /* skip */
       }
+    } else if (opts?.emptySigHint) {
+      doc.font('Helvetica').fontSize(7).fillColor('#6b7280').text(opts.emptySigHint, x + 6, y + 26, {
+        width: w - 12,
+      })
+      doc.fillColor('#111111')
     }
   }
 
@@ -598,56 +604,48 @@ export async function buildMechanicWorkReportPdf(params: {
 
   drawInvoiceBlock()
 
-  ensureSpace(96)
+  ensureSpace(88)
   doc.x = marginLeft
   doc.font('Helvetica-Bold').fontSize(10).fillColor('#111111')
   doc.text('Signatures', marginLeft, doc.y, { width: contentW, align: 'left' })
   doc.moveDown(0.25)
   const sigRowY = doc.y + 2
-  const half = (contentW - 10) / 2
+  const sigGap = 8
+  const sigThird = (contentW - 2 * sigGap) / 3
   const sigCellH = 64
+
   await drawSignatureCell(
     'Technician',
     form.technicianName,
     form.technicianSignatureDataUrl || undefined,
     marginLeft,
     sigRowY,
-    half,
+    sigThird,
     sigCellH
   )
   await drawSignatureCell(
     'Supervisor',
     form.supervisorName,
     form.supervisorSignatureDataUrl || undefined,
-    marginLeft + half + 10,
+    marginLeft + sigThird + sigGap,
     sigRowY,
-    half,
+    sigThird,
     sigCellH
   )
-  doc.y = sigRowY + sigCellH + 6
+  await drawSignatureCell(
+    'Client',
+    asText(form.clientSignatoryName) || '(signatory name)',
+    signatureDataUrl || undefined,
+    marginLeft + 2 * (sigThird + sigGap),
+    sigRowY,
+    sigThird,
+    sigCellH,
+    { emptySigHint: 'No signature captured.' }
+  )
 
-  ensureSpace(84)
+  doc.fillColor('#111111')
+  doc.y = sigRowY + sigCellH + 10
   doc.x = marginLeft
-  doc.font('Helvetica-Bold').fontSize(9).fillColor('#111111')
-  doc.text(`Client: ${form.clientSignatoryName || '(signatory name)'}`, marginLeft, doc.y, {
-    width: contentW,
-    align: 'left',
-  })
-  const cx = marginLeft
-  const cy = doc.y + 4
-  doc.rect(cx, cy, contentW, 64).strokeColor('#d4d4d8').lineWidth(0.9).stroke()
-  const custBuf = signatureDataUrl ? await imageBufferFromUrl(asText(signatureDataUrl)) : null
-  if (custBuf) {
-    try {
-      doc.image(custBuf, cx + 6, cy + 6, { fit: [contentW - 12, 52], valign: 'center' })
-    } catch {
-      doc.font('Helvetica').fontSize(8).text('Customer signature could not be rendered.', cx + 8, cy + 26)
-    }
-  } else {
-    doc.font('Helvetica').fontSize(8).fillColor('#6b7280').text('No signature captured.', cx + 8, cy + 26)
-    doc.fillColor('#111111')
-  }
-  doc.y = cy + 70
 
   doc.end()
   return done

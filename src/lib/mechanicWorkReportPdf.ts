@@ -103,7 +103,12 @@ export async function buildMechanicWorkReportPdf(params: {
 
   const doc = new PDFDocument({
     size: 'A4',
-    margin: 36,
+    margins: {
+      top: 18,
+      bottom: 36,
+      left: 36,
+      right: 36,
+    },
     compress: true,
   })
   const chunks: Buffer[] = []

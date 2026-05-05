@@ -477,29 +477,48 @@ export async function buildMechanicWorkReportPdf(params: {
     doc.x = marginLeft
   }
 
-  /** Always Before | After two columns; empty side shows frame only. Height follows image aspect (fit, capped). */
+  /** Before | After two columns; height scales down on portrait photos so block + signatures stay on one page. */
   const drawBeforeAfterPhotoGrid = async () => {
     const colGap = 10
     const halfW = (contentW - colGap) / 2
     const innerW = Math.max(32, halfW - 2)
-    const maxPhotoH = 260
-    const placeholderMin = 76
-
-    const primaryBefore = beforeImages.at(-1)
-    const primaryAfter = afterImages.at(-1)
-    const beforeBuf = primaryBefore ? await imageBufferFromUrl(primaryBefore.url) : null
-    const afterBuf = primaryAfter ? await imageBufferFromUrl(primaryAfter.url) : null
-
-    const hBefore = pdfPhotoCellHeight(innerW, beforeBuf, maxPhotoH, placeholderMin)
-    const hAfter = pdfPhotoCellHeight(innerW, afterBuf, maxPhotoH, placeholderMin)
-    const rowH = Math.max(hBefore, hAfter)
+    const placeholderMin = 68
+    const bottomLimit = pageBottom()
+    /** Height still needed after this grid (overview strip, invoice, signatures) — matches ensureSpace + drawing below */
+    const reserveBelowPhotos =
+      (overviewImages.length > 0 ? 98 : 0) +
+      (isInvoice ? 62 : 0) +
+      92 +
+      24
 
     doc.font('Helvetica-Bold').fontSize(9).fillColor('#111111')
     const labelH = Math.max(
       doc.heightOfString('Before', { width: halfW }),
       doc.heightOfString('After', { width: halfW })
     )
-    ensureSpace(rowH + labelH + 28)
+
+    const primaryBefore = beforeImages.at(-1)
+    const primaryAfter = afterImages.at(-1)
+    const beforeBuf = primaryBefore ? await imageBufferFromUrl(primaryBefore.url) : null
+    const afterBuf = primaryAfter ? await imageBufferFromUrl(primaryAfter.url) : null
+
+    let maxPhotoH = 220
+    let rowH = placeholderMin
+    while (maxPhotoH >= placeholderMin) {
+      const hBefore = pdfPhotoCellHeight(innerW, beforeBuf, maxPhotoH, placeholderMin)
+      const hAfter = pdfPhotoCellHeight(innerW, afterBuf, maxPhotoH, placeholderMin)
+      rowH = Math.max(hBefore, hAfter)
+      const photoSectionHeight = labelH + 4 + rowH + 10
+      if (doc.y + photoSectionHeight + reserveBelowPhotos <= bottomLimit) break
+      maxPhotoH -= 14
+    }
+
+    if (doc.y + labelH + 4 + rowH + 10 + reserveBelowPhotos > bottomLimit) {
+      maxPhotoH = placeholderMin
+      const hBefore = pdfPhotoCellHeight(innerW, beforeBuf, maxPhotoH, placeholderMin)
+      const hAfter = pdfPhotoCellHeight(innerW, afterBuf, maxPhotoH, placeholderMin)
+      rowH = Math.max(hBefore, hAfter)
+    }
 
     const titleTop = doc.y
     doc.text('Before', marginLeft, titleTop, { width: halfW, align: 'left' })

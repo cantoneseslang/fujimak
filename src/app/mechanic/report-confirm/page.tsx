@@ -295,8 +295,8 @@ export default function MechanicReportConfirmPage() {
   const recordedTime = getLatestRecordedTime(record?.remarks ?? null) || asText(record?.completed_at)
   const latestComment = getLatestComment(record?.remarks ?? null) || '-'
 
-  /** Pair before[i] with after[i] (PDF shows slot grid; preview avoids stacking many thumbs in one row). */
-  const evidencePairCount = Math.min(6, Math.max(beforeImages.length, afterImages.length))
+  const extraBeforeCount = Math.max(0, beforeImages.length - 1)
+  const extraAfterCount = Math.max(0, afterImages.length - 1)
 
   const hasSignature = signatureDataUrl.length > 0
 
@@ -934,22 +934,22 @@ export default function MechanicReportConfirmPage() {
                   Before / After evidence
                 </p>
                 <div className="mt-2 grid gap-3 md:grid-cols-[minmax(0,1fr)_220px]">
-                  <div className="space-y-4">
-                    {evidencePairCount === 0 ? (
+                  <div>
+                    {beforeImages.length === 0 && afterImages.length === 0 ? (
                       <p className="text-zinc-500" style={{ marginLeft: '6px' }}>
                         -
                       </p>
                     ) : (
-                      Array.from({ length: evidencePairCount }, (_, i) => (
-                        <div key={`evidence-pair-${i}`} className="grid grid-cols-2 gap-3">
+                      <>
+                        <div className="grid grid-cols-2 gap-3">
                           <div>
                             <p className="mb-1 text-xs font-semibold text-zinc-600">Before</p>
                             <div className="flex min-h-[120px] items-center justify-center rounded border border-zinc-200 bg-zinc-50 p-1">
-                              {beforeImages[i] ? (
+                              {beforeImages[0] ? (
                                 /* eslint-disable-next-line @next/next/no-img-element -- attachment preview URL */
                                 <img
-                                  src={beforeImages[i].url}
-                                  alt={beforeImages[i].name}
+                                  src={beforeImages[0].url}
+                                  alt={beforeImages[0].name}
                                   className="max-h-[min(42vh,280px)] w-full object-contain"
                                 />
                               ) : (
@@ -960,11 +960,11 @@ export default function MechanicReportConfirmPage() {
                           <div>
                             <p className="mb-1 text-xs font-semibold text-zinc-600">After</p>
                             <div className="flex min-h-[120px] items-center justify-center rounded border border-zinc-200 bg-zinc-50 p-1">
-                              {afterImages[i] ? (
+                              {afterImages[0] ? (
                                 /* eslint-disable-next-line @next/next/no-img-element -- attachment preview URL */
                                 <img
-                                  src={afterImages[i].url}
-                                  alt={afterImages[i].name}
+                                  src={afterImages[0].url}
+                                  alt={afterImages[0].name}
                                   className="max-h-[min(42vh,280px)] w-full object-contain"
                                 />
                               ) : (
@@ -973,7 +973,16 @@ export default function MechanicReportConfirmPage() {
                             </div>
                           </div>
                         </div>
-                      ))
+                        {(extraBeforeCount > 0 || extraAfterCount > 0) && (
+                          <p className="mt-2 text-xs leading-relaxed text-zinc-500" style={{ marginLeft: '6px' }}>
+                            このプレビューとPDFは先頭の Before / After それぞれ1枚のみです。
+                            {extraBeforeCount > 0 ? ` Before ほか${extraBeforeCount}枚` : ''}
+                            {extraBeforeCount > 0 && extraAfterCount > 0 ? '、' : ''}
+                            {extraAfterCount > 0 ? ` After ほか${extraAfterCount}枚` : ''}
+                            がリクエストに添付されています。
+                          </p>
+                        )}
+                      </>
                     )}
                   </div>
                   <div className="flex flex-col gap-3">

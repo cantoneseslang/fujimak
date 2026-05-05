@@ -163,7 +163,7 @@ export async function buildMechanicWorkReportPdf(params: {
   const doc = new PDFDocument({
     size: 'A4',
     margins: {
-      top: 18,
+      top: 26,
       bottom: 36,
       left: 36,
       right: 36,

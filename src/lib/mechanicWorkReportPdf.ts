@@ -203,7 +203,7 @@ export async function buildMechanicWorkReportPdf(params: {
 
   const drawChecklist = () => {
     ensureSpace(162)
-    doc.font('Helvetica-Bold').fontSize(10).text('Technical checklist')
+    doc.font('Helvetica-Bold').fontSize(10).text('Technical checklist comments')
     doc.moveDown(0.35)
     doc.font('Helvetica').fontSize(7.8)
     for (let i = 0; i < MAINTENANCE_CHECKLIST_LABELS.length; i++) {
@@ -219,7 +219,7 @@ export async function buildMechanicWorkReportPdf(params: {
 
   const drawRankConditions = () => {
     ensureSpace(92)
-    doc.font('Helvetica-Bold').fontSize(9).text('Ranking & condition')
+    doc.font('Helvetica-Bold').fontSize(9).text('Ranking')
     doc.moveDown(0.25)
     doc.font('Helvetica').fontSize(7.2).fillColor('#374151')
     doc.text(rankLabel(form.rank), marginLeft, doc.y, { width: contentW })
@@ -336,31 +336,36 @@ export async function buildMechanicWorkReportPdf(params: {
   drawHeaderBand()
 
   doc.font('Helvetica-Bold').fontSize(9).text(`Request ID: ${request.id}`)
-  doc.font('Helvetica').fontSize(8).fillColor('#64748b').text(`FOR: ${form.forBilling === 'billing' ? 'Billing' : 'Warranty'}`)
   doc.fillColor('#111111')
   doc.moveDown(0.45)
 
+  // 1. Client / dates / equipment (header body)
   drawLabelValueRows([
     ['Client', form.clientLabel],
     ['PIC', form.picName],
     ['Location', form.locationText],
-    ['Equipment', form.equipmentLabel],
-    ['Brand', form.brand],
-    ['Model / Serial', `${asText(request.machine_model) || '-'} / ${asText(request.machine_serial) || '-'}`],
+    ['Machine', form.equipmentLabel],
+    ['Model', form.brand],
+    ['Serial', form.serialNumber],
     ['Start Time', form.startTimeDisplay],
     ['Finish Time', form.finishTimeDisplay],
-    ['If For Billing', form.billingNote || '-'],
+  ])
+
+  // 2. FOR — warranty / billing, then narrative fields in form order
+  drawLabelValueRows([
+    ['Warranty', form.forBilling === 'warranty' ? 'Yes' : '—'],
+    ['Billing', form.forBilling === 'billing' ? 'Yes' : '—'],
+    ['If For Billing (note)', form.billingNote || '—'],
   ])
 
   drawBoxParagraph('Concern', form.concern, 44)
   drawBoxParagraph('Action Taken', form.actionTaken, 52)
+  drawLabelValueRows([['Finish (Status F)', form.statusF]])
   drawBoxParagraph('Recommendation', form.recommendation, 40)
 
+  // 3. Technical checklist — 4. Ranking
   drawChecklist()
   drawRankConditions()
-
-  doc.font('Helvetica-Bold').fontSize(9).text(`Status(F): ${form.statusF}`)
-  doc.moveDown(0.45)
 
   const thumbW = (contentW - 16) / 2
   const thumbH = 72

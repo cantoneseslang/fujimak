@@ -10,6 +10,7 @@ export interface MaintenanceReportFormSnapshot {
   locationText: string
   equipmentLabel: string
   brand: string
+  serialNumber: string
   startTimeDisplay: string
   finishTimeDisplay: string
   forBilling: ForBillingOption
@@ -120,6 +121,7 @@ export function defaultMaintenanceReportForm(): MaintenanceReportFormSnapshot {
     locationText: '',
     equipmentLabel: '',
     brand: '',
+    serialNumber: '',
     startTimeDisplay: '',
     finishTimeDisplay: '',
     forBilling: 'billing',
@@ -175,14 +177,19 @@ export function buildMaintenanceReportFormState(
     formCode: asText(p.formCode) || d.formCode,
     clientLabel: asText(p.clientLabel) || asText(record.requested_by) || asText(record.store_name) || record.store_id,
     picName: asText(p.picName) || asText(record.requested_by) || '',
-    locationText: asText(p.locationText) || asText(record.store_name) || record.store_id,
+    locationText:
+      asText(p.locationText) ||
+      asText(record.fault_location) ||
+      asText(record.store_name) ||
+      record.store_id,
     equipmentLabel:
       asText(p.equipmentLabel) ||
       asText(record.machine_name) ||
-      asText(record.fault_location) ||
+      asText(record.machine_model) ||
       asText(record.item_id) ||
       '-',
-    brand: asText(p.brand) || '-',
+    brand: asText(p.brand) || asText(record.machine_model) || '-',
+    serialNumber: asText(p.serialNumber) || asText(record.machine_serial) || '-',
     startTimeDisplay: asText(p.startTimeDisplay) || inferredStart || '-',
     finishTimeDisplay: asText(p.finishTimeDisplay) || inferredFinish || '-',
     forBilling: pickForBilling(p.forBilling),

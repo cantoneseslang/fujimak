@@ -497,18 +497,108 @@ export default function MechanicReportConfirmPage() {
         ) : record ? (
           <div className="mx-auto flex w-full max-w-[220mm] flex-col justify-center gap-4">
             <details
-              open
               className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm"
               style={{ marginLeft: '6px', width: 'calc(100% - 6px)' }}
             >
               <summary className="cursor-pointer text-sm font-semibold text-zinc-900">
                 Maintenance report — finish (PDF)
               </summary>
-              <p className="mt-2 text-xs text-zinc-500">
-                Edit before Save PDF / Send. FOR / checklist / ranking appear on the printed Maintenance Report (overview photo uses attachment source “mechanic_overview” when added).
+
+              <details className="mt-3 rounded-lg border border-zinc-200 bg-white px-3 py-2">
+                <summary className="cursor-pointer text-xs font-semibold text-zinc-800">
+                  More header fields (client / dates / equipment)
+                </summary>
+                <div className="mt-3 grid gap-3 pb-2 sm:grid-cols-2">
+                <label className="flex flex-col gap-1 text-xs font-medium text-zinc-700">
+                  Form code
+                  <input
+                    value={reportForm.formCode}
+                    onChange={(e) => setReportForm((p) => ({ ...p, formCode: e.target.value }))}
+                    className="rounded-lg border border-zinc-300 px-2 py-2 text-sm"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-xs font-medium text-zinc-700">
+                  Operation date (printed)
+                  <input
+                    value={reportForm.operationDateText}
+                    onChange={(e) => setReportForm((p) => ({ ...p, operationDateText: e.target.value }))}
+                    className="rounded-lg border border-zinc-300 px-2 py-2 text-sm"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-xs font-medium text-zinc-700">
+                  Client
+                  <input
+                    value={reportForm.clientLabel}
+                    onChange={(e) => setReportForm((p) => ({ ...p, clientLabel: e.target.value }))}
+                    className="rounded-lg border border-zinc-300 px-2 py-2 text-sm"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-xs font-medium text-zinc-700">
+                  PIC
+                  <input
+                    value={reportForm.picName}
+                    onChange={(e) => setReportForm((p) => ({ ...p, picName: e.target.value }))}
+                    className="rounded-lg border border-zinc-300 px-2 py-2 text-sm"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-xs font-medium text-zinc-700">
+                  Fault location
+                  <input
+                    value={reportForm.locationText}
+                    onChange={(e) => setReportForm((p) => ({ ...p, locationText: e.target.value }))}
+                    className="rounded-lg border border-zinc-300 px-2 py-2 text-sm"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-xs font-medium text-zinc-700">
+                  Equipment
+                  <input
+                    value={reportForm.equipmentLabel}
+                    onChange={(e) => setReportForm((p) => ({ ...p, equipmentLabel: e.target.value }))}
+                    className="rounded-lg border border-zinc-300 px-2 py-2 text-sm"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-xs font-medium text-zinc-700">
+                  Model
+                  <input
+                    value={reportForm.brand}
+                    onChange={(e) => setReportForm((p) => ({ ...p, brand: e.target.value }))}
+                    className="rounded-lg border border-zinc-300 px-2 py-2 text-sm"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-xs font-medium text-zinc-700">
+                  Serial number
+                  <input
+                    value={reportForm.serialNumber}
+                    onChange={(e) => setReportForm((p) => ({ ...p, serialNumber: e.target.value }))}
+                    className="rounded-lg border border-zinc-300 px-2 py-2 text-sm"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-xs font-medium text-zinc-700">
+                  Start time (display)
+                  <input
+                    value={reportForm.startTimeDisplay}
+                    onChange={(e) => setReportForm((p) => ({ ...p, startTimeDisplay: e.target.value }))}
+                    className="rounded-lg border border-zinc-300 px-2 py-2 text-sm"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-xs font-medium text-zinc-700">
+                  Finish time (display)
+                  <input
+                    value={reportForm.finishTimeDisplay}
+                    onChange={(e) => setReportForm((p) => ({ ...p, finishTimeDisplay: e.target.value }))}
+                    className="rounded-lg border border-zinc-300 px-2 py-2 text-sm"
+                  />
+                </label>
+                </div>
+              </details>
+
+              <p className="mt-3 text-xs text-zinc-500">
+                Open each section below to edit. Save PDF uses the same order: header → FOR → checklist → ranking.
               </p>
 
-              <div className="mt-4 space-y-4 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+              <details className="mt-3 rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+                <summary className="cursor-pointer text-xs font-semibold text-zinc-800">FOR</summary>
+                <div className="mt-3 space-y-4">
                 <div className="space-y-2">
                   <p className="text-xs font-semibold text-zinc-800">{tm('forBillingTitle')}</p>
                   <div className="flex flex-wrap gap-2">
@@ -565,6 +655,14 @@ export default function MechanicReportConfirmPage() {
                   />
                 </label>
                 <label className="flex flex-col gap-1 text-xs font-medium text-zinc-700">
+                  Finish (Status F)
+                  <input
+                    value={reportForm.statusF}
+                    onChange={(e) => setReportForm((p) => ({ ...p, statusF: e.target.value }))}
+                    className="rounded-lg border border-zinc-300 bg-white px-2 py-2 text-sm"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-xs font-medium text-zinc-700">
                   Recommendation
                   <textarea
                     value={reportForm.recommendation}
@@ -573,94 +671,15 @@ export default function MechanicReportConfirmPage() {
                     className="rounded-lg border border-zinc-300 bg-white px-2 py-2 text-sm"
                   />
                 </label>
-              </div>
-
-              <details className="mt-4 rounded-lg border border-zinc-200 bg-white px-3 py-2">
-                <summary className="cursor-pointer text-xs font-semibold text-zinc-800">
-                  More header fields (client / dates / equipment)
-                </summary>
-                <div className="mt-3 grid gap-3 pb-2 sm:grid-cols-2">
-                <label className="flex flex-col gap-1 text-xs font-medium text-zinc-700">
-                  Form code
-                  <input
-                    value={reportForm.formCode}
-                    onChange={(e) => setReportForm((p) => ({ ...p, formCode: e.target.value }))}
-                    className="rounded-lg border border-zinc-300 px-2 py-2 text-sm"
-                  />
-                </label>
-                <label className="flex flex-col gap-1 text-xs font-medium text-zinc-700">
-                  Operation date (printed)
-                  <input
-                    value={reportForm.operationDateText}
-                    onChange={(e) => setReportForm((p) => ({ ...p, operationDateText: e.target.value }))}
-                    className="rounded-lg border border-zinc-300 px-2 py-2 text-sm"
-                  />
-                </label>
-                <label className="flex flex-col gap-1 text-xs font-medium text-zinc-700">
-                  Client
-                  <input
-                    value={reportForm.clientLabel}
-                    onChange={(e) => setReportForm((p) => ({ ...p, clientLabel: e.target.value }))}
-                    className="rounded-lg border border-zinc-300 px-2 py-2 text-sm"
-                  />
-                </label>
-                <label className="flex flex-col gap-1 text-xs font-medium text-zinc-700">
-                  PIC
-                  <input
-                    value={reportForm.picName}
-                    onChange={(e) => setReportForm((p) => ({ ...p, picName: e.target.value }))}
-                    className="rounded-lg border border-zinc-300 px-2 py-2 text-sm"
-                  />
-                </label>
-                <label className="flex flex-col gap-1 text-xs font-medium text-zinc-700">
-                  Location
-                  <input
-                    value={reportForm.locationText}
-                    onChange={(e) => setReportForm((p) => ({ ...p, locationText: e.target.value }))}
-                    className="rounded-lg border border-zinc-300 px-2 py-2 text-sm"
-                  />
-                </label>
-                <label className="flex flex-col gap-1 text-xs font-medium text-zinc-700">
-                  Equipment
-                  <input
-                    value={reportForm.equipmentLabel}
-                    onChange={(e) => setReportForm((p) => ({ ...p, equipmentLabel: e.target.value }))}
-                    className="rounded-lg border border-zinc-300 px-2 py-2 text-sm"
-                  />
-                </label>
-                <label className="flex flex-col gap-1 text-xs font-medium text-zinc-700">
-                  Brand
-                  <input
-                    value={reportForm.brand}
-                    onChange={(e) => setReportForm((p) => ({ ...p, brand: e.target.value }))}
-                    className="rounded-lg border border-zinc-300 px-2 py-2 text-sm"
-                  />
-                </label>
-                <label className="flex flex-col gap-1 text-xs font-medium text-zinc-700">
-                  Start time (display)
-                  <input
-                    value={reportForm.startTimeDisplay}
-                    onChange={(e) => setReportForm((p) => ({ ...p, startTimeDisplay: e.target.value }))}
-                    className="rounded-lg border border-zinc-300 px-2 py-2 text-sm"
-                  />
-                </label>
-                <label className="flex flex-col gap-1 text-xs font-medium text-zinc-700">
-                  Finish time (display)
-                  <input
-                    value={reportForm.finishTimeDisplay}
-                    onChange={(e) => setReportForm((p) => ({ ...p, finishTimeDisplay: e.target.value }))}
-                    className="rounded-lg border border-zinc-300 px-2 py-2 text-sm"
-                  />
-                </label>
                 </div>
               </details>
-              <div className="mt-4 space-y-3">
-                <div>
-                  <p className="text-xs font-semibold text-zinc-800">Technical checklist comments</p>
-                  <p className="mt-1 text-[11px] text-zinc-500">
-                    Tap NA or type a comment (max {MAINTENANCE_CHECKLIST_COMMENT_MAX} characters per line).
-                  </p>
-                </div>
+
+              <details className="mt-3 rounded-lg border border-zinc-200 bg-white px-3 py-2">
+                <summary className="cursor-pointer text-xs font-semibold text-zinc-800">Technical checklist comments</summary>
+                <div className="mt-3 space-y-3">
+                <p className="text-[11px] text-zinc-500">
+                  Tap NA or type a comment (max {MAINTENANCE_CHECKLIST_COMMENT_MAX} characters per line).
+                </p>
                 <div className="flex flex-col gap-3">
                   {MAINTENANCE_CHECKLIST_LABELS.map((label, idx) => {
                     const stored = reportForm.checklistComments[idx] ?? 'NA'
@@ -715,12 +734,15 @@ export default function MechanicReportConfirmPage() {
                     )
                   })}
                 </div>
-              </div>
+                </div>
+              </details>
 
-              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <details className="mt-3 rounded-lg border border-zinc-200 bg-white px-3 py-2">
+                <summary className="cursor-pointer text-xs font-semibold text-zinc-800">Ranking</summary>
+                <div className="mt-3 grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <p id="maintenance-rank-label" className="text-xs font-semibold text-zinc-800">
-                    Ranking
+                    Maintenance rank
                   </p>
                   <RankWheelPicker
                     ariaLabelledBy="maintenance-rank-label"
@@ -746,16 +768,9 @@ export default function MechanicReportConfirmPage() {
                       <option value="dangerous">× Dangerous</option>
                     </select>
                   </label>
-                  <label className="flex flex-col gap-1 text-xs font-medium text-zinc-700">
-                    Status(F)
-                    <input
-                      value={reportForm.statusF}
-                      onChange={(e) => setReportForm((p) => ({ ...p, statusF: e.target.value }))}
-                      className="rounded-lg border border-zinc-300 px-2 py-2 text-sm"
-                    />
-                  </label>
                 </div>
-              </div>
+                </div>
+              </details>
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
                 <label className="flex flex-col gap-1 text-xs font-medium text-zinc-700">
                   Technician name
@@ -802,23 +817,49 @@ export default function MechanicReportConfirmPage() {
                 </div>
               </div>
 
-              <div className="mb-4 grid gap-2 text-sm text-zinc-700">
+              <div className="mb-4 grid gap-3 text-sm text-zinc-700">
                 <p style={{ marginLeft: '6px' }}>
                   <span className="font-semibold">Request ID:</span> {record.id}
                 </p>
                 <p style={{ marginLeft: '6px' }}>
                   <span className="font-semibold">Store:</span> {record.store_name || record.store_id}
                 </p>
-                <p style={{ marginLeft: '6px' }}>
-                  <span className="font-semibold">Machine:</span> {record.machine_name || record.machine_model || '-'}
-                </p>
-                <p style={{ marginLeft: '6px' }}>
-                  <span className="font-semibold">Model / Serial:</span> {record.machine_model || '-'} /{' '}
-                  {record.machine_serial || '-'}
-                </p>
-                <p style={{ marginLeft: '6px' }}>
-                  <span className="font-semibold">Fault Location:</span> {record.fault_location || '-'}
-                </p>
+                <label className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3" style={{ marginLeft: '6px' }}>
+                  <span className="min-w-[8rem] shrink-0 font-semibold">Machine:</span>
+                  <input
+                    value={reportForm.equipmentLabel}
+                    onChange={(e) => setReportForm((p) => ({ ...p, equipmentLabel: e.target.value }))}
+                    className="w-full min-w-0 flex-1 rounded-md border border-zinc-300 px-2 py-2 text-zinc-800"
+                  />
+                </label>
+                <div
+                  className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3"
+                  style={{ marginLeft: '6px' }}
+                >
+                  <span className="min-w-[8rem] shrink-0 font-semibold">Model / Serial:</span>
+                  <div className="flex w-full min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:gap-2">
+                    <input
+                      value={reportForm.brand}
+                      onChange={(e) => setReportForm((p) => ({ ...p, brand: e.target.value }))}
+                      placeholder="Model"
+                      className="w-full min-w-0 flex-1 rounded-md border border-zinc-300 px-2 py-2 text-zinc-800"
+                    />
+                    <input
+                      value={reportForm.serialNumber}
+                      onChange={(e) => setReportForm((p) => ({ ...p, serialNumber: e.target.value }))}
+                      placeholder="Serial"
+                      className="w-full min-w-0 flex-1 rounded-md border border-zinc-300 px-2 py-2 text-zinc-800"
+                    />
+                  </div>
+                </div>
+                <label className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3" style={{ marginLeft: '6px' }}>
+                  <span className="min-w-[8rem] shrink-0 font-semibold">Fault Location:</span>
+                  <input
+                    value={reportForm.locationText}
+                    onChange={(e) => setReportForm((p) => ({ ...p, locationText: e.target.value }))}
+                    className="w-full min-w-0 flex-1 rounded-md border border-zinc-300 px-2 py-2 text-zinc-800"
+                  />
+                </label>
                 <p style={{ marginLeft: '6px' }}>
                   <span className="font-semibold">Symptom:</span> {record.symptom || '-'}
                 </p>

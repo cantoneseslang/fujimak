@@ -157,8 +157,8 @@ export async function buildMechanicWorkReportPdf(params: {
 
   const attachments = parseAttachments(request.attachments)
   const overviewImages = attachments.filter((i) => i.source === 'mechanic_overview' && i.type === 'image').slice(0, 2)
-  const beforeImages = attachments.filter((i) => i.source === 'mechanic_before' && i.type === 'image').slice(0, 4)
-  const afterImages = attachments.filter((i) => i.source === 'mechanic_after' && i.type === 'image').slice(0, 4)
+  const beforeImages = attachments.filter((i) => i.source === 'mechanic_before' && i.type === 'image')
+  const afterImages = attachments.filter((i) => i.source === 'mechanic_after' && i.type === 'image')
 
   const doc = new PDFDocument({
     size: 'A4',
@@ -481,8 +481,10 @@ export async function buildMechanicWorkReportPdf(params: {
     const maxPhotoH = 260
     const placeholderMin = 76
 
-    const beforeBuf = beforeImages[0] ? await imageBufferFromUrl(beforeImages[0].url) : null
-    const afterBuf = afterImages[0] ? await imageBufferFromUrl(afterImages[0].url) : null
+    const primaryBefore = beforeImages.at(-1)
+    const primaryAfter = afterImages.at(-1)
+    const beforeBuf = primaryBefore ? await imageBufferFromUrl(primaryBefore.url) : null
+    const afterBuf = primaryAfter ? await imageBufferFromUrl(primaryAfter.url) : null
 
     const hBefore = pdfPhotoCellHeight(innerW, beforeBuf, maxPhotoH, placeholderMin)
     const hAfter = pdfPhotoCellHeight(innerW, afterBuf, maxPhotoH, placeholderMin)

@@ -189,7 +189,7 @@ export default function ManagementInvoicePage() {
                 <div className="mb-5">
                   <p className="mb-2 text-sm font-semibold text-zinc-800">Before Photos</p>
                   <div className="grid grid-cols-2 gap-3">
-                    {beforeImages.slice(0, 4).map((image) => (
+                    {beforeImages.slice(-4).map((image) => (
                       <div key={image.url} className="overflow-hidden rounded-lg border border-zinc-200 bg-white">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={image.url} alt={image.name} className="h-28 w-full object-contain bg-white" />

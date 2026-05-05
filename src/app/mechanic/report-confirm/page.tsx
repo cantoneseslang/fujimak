@@ -976,8 +976,11 @@ export default function MechanicReportConfirmPage() {
                           <div>
                             <p className="mb-1 text-xs font-semibold text-zinc-600">Before</p>
                             <div className="flex min-h-[120px] items-center justify-center rounded border border-zinc-200 bg-zinc-50 p-1">
-                              {beforeImages[0] ? (
-                                <EvidenceAttachmentImg url={beforeImages[0].url} name={beforeImages[0].name} />
+                              {beforeImages.length > 0 ? (
+                                <EvidenceAttachmentImg
+                                  url={beforeImages[beforeImages.length - 1]!.url}
+                                  name={beforeImages[beforeImages.length - 1]!.name}
+                                />
                               ) : (
                                 <span className="text-xs text-zinc-400">—</span>
                               )}
@@ -986,8 +989,11 @@ export default function MechanicReportConfirmPage() {
                           <div>
                             <p className="mb-1 text-xs font-semibold text-zinc-600">After</p>
                             <div className="flex min-h-[120px] items-center justify-center rounded border border-zinc-200 bg-zinc-50 p-1">
-                              {afterImages[0] ? (
-                                <EvidenceAttachmentImg url={afterImages[0].url} name={afterImages[0].name} />
+                              {afterImages.length > 0 ? (
+                                <EvidenceAttachmentImg
+                                  url={afterImages[afterImages.length - 1]!.url}
+                                  name={afterImages[afterImages.length - 1]!.name}
+                                />
                               ) : (
                                 <span className="text-xs text-zinc-400">—</span>
                               )}
@@ -996,7 +1002,9 @@ export default function MechanicReportConfirmPage() {
                         </div>
                         {(extraBeforeCount > 0 || extraAfterCount > 0) && (
                           <p className="mt-2 text-xs leading-relaxed text-zinc-500" style={{ marginLeft: '6px' }}>
-                            このプレビューとPDFは先頭の Before / After それぞれ1枚のみです。
+                            このプレビューとPDFは、Before / After{' '}
+                            <strong className="font-medium text-zinc-600">それぞれ最新の1枚</strong>
+                            のみ表示します（複数ある場合は、いちばん後から追加された写真）。
                             {extraBeforeCount > 0 ? ` Before ほか${extraBeforeCount}枚` : ''}
                             {extraBeforeCount > 0 && extraAfterCount > 0 ? '、' : ''}
                             {extraAfterCount > 0 ? ` After ほか${extraAfterCount}枚` : ''}

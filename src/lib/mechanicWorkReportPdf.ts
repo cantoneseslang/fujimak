@@ -165,6 +165,7 @@ export async function buildMechanicWorkReportPdf(params: {
 
     doc.y = bandTop + Math.max(logoH, 38)
     doc.moveDown(0.35)
+    doc.x = marginLeft
   }
 
   const drawLabelValueRows = (rows: Array<[string, string]>) => {
@@ -185,6 +186,7 @@ export async function buildMechanicWorkReportPdf(params: {
       doc.y = rowTop + rowH + 6
     }
     doc.moveDown(0.2)
+    doc.x = marginLeft
   }
 
   /** Header grid: two-column pairs; last row Symptom | FOR (Warranty / Billing). */
@@ -240,6 +242,7 @@ export async function buildMechanicWorkReportPdf(params: {
     }
 
     doc.moveDown(0.25)
+    doc.x = marginLeft
   }
 
   /** Bordered body; empty or "-" → inner height fixed to two lines at body font size. */
@@ -275,7 +278,7 @@ export async function buildMechanicWorkReportPdf(params: {
 
     doc.x = marginLeft
     doc.font('Helvetica-Bold').fontSize(9).fillColor('#111111')
-    doc.text(heading, marginLeft, doc.y, { width: contentW, align: 'left' })
+    doc.text(heading, marginLeft, doc.y)
 
     const top = doc.y + 2
     doc.rect(marginLeft, top, contentW, boxH).strokeColor('#d4d4d8').lineWidth(0.8).stroke()
@@ -286,6 +289,7 @@ export async function buildMechanicWorkReportPdf(params: {
     })
     doc.fillColor('#111111')
     doc.y = top + boxH + 8
+    doc.x = marginLeft
   }
 
   const drawChecklist = () => {
@@ -295,7 +299,9 @@ export async function buildMechanicWorkReportPdf(params: {
     const half = Math.ceil(n / 2)
 
     ensureSpace(26)
-    doc.font('Helvetica-Bold').fontSize(10).text('Technical checklist comments')
+    doc.x = marginLeft
+    doc.font('Helvetica-Bold').fontSize(10).fillColor('#111111')
+    doc.text('Technical checklist comments', marginLeft, doc.y, { width: contentW, align: 'left' })
     doc.moveDown(0.28)
     doc.font('Helvetica').fontSize(7.5).fillColor('#111111')
 
@@ -327,11 +333,14 @@ export async function buildMechanicWorkReportPdf(params: {
     }
     doc.fillColor('#111111')
     doc.moveDown(0.35)
+    doc.x = marginLeft
   }
 
   const drawRankConditions = () => {
     ensureSpace(28)
-    doc.font('Helvetica-Bold').fontSize(9).text('Ranking')
+    doc.x = marginLeft
+    doc.font('Helvetica-Bold').fontSize(9).fillColor('#111111')
+    doc.text('Ranking', marginLeft, doc.y, { width: contentW, align: 'left' })
     doc.moveDown(0.22)
     doc.font('Helvetica').fontSize(8).fillColor('#111111')
     doc.text(`Rank: ${form.rank} — ${rankLabel(form.rank)}`, marginLeft, doc.y, { width: contentW })
@@ -345,12 +354,15 @@ export async function buildMechanicWorkReportPdf(params: {
     doc.text(conditionLine, marginLeft, doc.y, { width: contentW })
     doc.fillColor('#111111')
     doc.moveDown(0.35)
+    doc.x = marginLeft
   }
 
   const drawPhotoStrip = async (label: string, images: ReportAttachment[], thumbW: number, thumbH: number) => {
     if (images.length === 0) return
     ensureSpace(thumbH + 34)
-    doc.font('Helvetica-Bold').fontSize(9).text(label)
+    doc.x = marginLeft
+    doc.font('Helvetica-Bold').fontSize(9).fillColor('#111111')
+    doc.text(label, marginLeft, doc.y, { width: contentW, align: 'left' })
     const rowY = doc.y + 4
     let x = marginLeft
     for (const item of images) {
@@ -376,12 +388,15 @@ export async function buildMechanicWorkReportPdf(params: {
       if (x + thumbW > marginRight) break
     }
     doc.y = rowY + thumbH + 10
+    doc.x = marginLeft
   }
 
   const drawInvoiceBlock = () => {
     if (!isInvoice) return
     ensureSpace(62)
-    doc.font('Helvetica-Bold').fontSize(10).text('Invoice summary')
+    doc.x = marginLeft
+    doc.font('Helvetica-Bold').fontSize(10).fillColor('#111111')
+    doc.text('Invoice summary', marginLeft, doc.y, { width: contentW, align: 'left' })
     const boxTop = doc.y + 2
     doc.rect(marginLeft, boxTop, contentW, 54).strokeColor('#18181b').lineWidth(1).stroke()
     const amt =
@@ -396,6 +411,7 @@ export async function buildMechanicWorkReportPdf(params: {
       { width: contentW - 16 }
     )
     doc.y = boxTop + 58
+    doc.x = marginLeft
   }
 
   const drawSignatureCell = async (
@@ -449,7 +465,9 @@ export async function buildMechanicWorkReportPdf(params: {
   drawInvoiceBlock()
 
   ensureSpace(96)
-  doc.font('Helvetica-Bold').fontSize(10).text('Signatures')
+  doc.x = marginLeft
+  doc.font('Helvetica-Bold').fontSize(10).fillColor('#111111')
+  doc.text('Signatures', marginLeft, doc.y, { width: contentW, align: 'left' })
   doc.moveDown(0.25)
   const sigRowY = doc.y + 2
   const half = (contentW - 10) / 2
@@ -474,7 +492,12 @@ export async function buildMechanicWorkReportPdf(params: {
   doc.y = sigRowY + 82
 
   ensureSpace(84)
-  doc.font('Helvetica-Bold').fontSize(9).text(`Client: ${form.clientSignatoryName || '(signatory name)'}`)
+  doc.x = marginLeft
+  doc.font('Helvetica-Bold').fontSize(9).fillColor('#111111')
+  doc.text(`Client: ${form.clientSignatoryName || '(signatory name)'}`, marginLeft, doc.y, {
+    width: contentW,
+    align: 'left',
+  })
   const cx = marginLeft
   const cy = doc.y + 4
   doc.rect(cx, cy, contentW, 64).strokeColor('#d4d4d8').lineWidth(0.9).stroke()

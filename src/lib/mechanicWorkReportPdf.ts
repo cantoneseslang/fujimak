@@ -609,8 +609,9 @@ export async function buildMechanicWorkReportPdf(params: {
   // 1. Same pairing / order as report-confirm “More header fields” (two-column grid)
   drawHeaderTwoColumnGrid()
 
-  if (form.forBilling === 'billing') {
-    drawLabelValueRows([['If For Billing (note)', form.billingNote || '—']])
+  const billingNoteTrimmed = asText(form.billingNote)
+  if (form.forBilling === 'billing' && billingNoteTrimmed.length > 0) {
+    drawLabelValueRows([['If For Billing (note)', billingNoteTrimmed]])
   }
 
   drawBoxParagraph('Concern', form.concern, 44 - 12)

@@ -887,12 +887,10 @@ export default function MechanicReportConfirmPage() {
                         {reportForm.forBilling === 'warranty' ? 'Warranty' : 'Billing'}
                       </dt>
                     </div>
-                    {reportForm.forBilling === 'billing' ? (
+                    {reportForm.forBilling === 'billing' && asText(reportForm.billingNote).length > 0 ? (
                       <div className="border-b border-zinc-200/80 pb-1.5 sm:col-span-2">
-                        <dt className="font-medium text-zinc-600">If For Billing (note)</dt>
-                        <dd className="mt-0.5 whitespace-pre-wrap text-zinc-800">
-                          {asText(reportForm.billingNote) || '—'}
-                        </dd>
+                        <dt className="font-medium text-zinc-600">{tm('billingNoteLabel')}</dt>
+                        <dd className="mt-0.5 whitespace-pre-wrap text-zinc-800">{asText(reportForm.billingNote)}</dd>
                       </div>
                     ) : null}
                   </dl>

@@ -321,9 +321,9 @@ export async function buildMechanicWorkReportPdf(params: {
 
       const hL = doc.heightOfString(lineL, { width: halfW })
       const hR = lineR ? doc.heightOfString(lineR, { width: halfW }) : 0
-      const rowH = Math.max(hL, hR, 10) + 5
+      const rowH = Math.max(hL, hR, 8) + 2.5
 
-      ensureSpace(rowH + 2)
+      ensureSpace(rowH + 1)
       const rowTop = doc.y
       doc.text(lineL, marginLeft, rowTop, { width: halfW })
       if (lineR) {

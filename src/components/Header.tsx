@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type MouseEvent } from 'react'
 import Image from 'next/image'
 import { Menu, ChevronLeft, X, Settings, Bell, LogOut, Globe } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import { signOut } from '@/app/auth/actions'
 
 const LANGUAGES = [
@@ -40,24 +40,15 @@ export default function Header({
   const globeTapTimerRef = useRef<number | null>(null)
   const modeToastTimerRef = useRef<number | null>(null)
   const [modeToast, setModeToast] = useState<string | null>(null)
-  const [currentLocale, setCurrentLocale] = useState(() => {
-    if (typeof document === 'undefined') return 'en'
-    const value = `; ${document.cookie}`
-    const parts = value.split('; locale=')
-    if (parts.length === 2) {
-      return parts.pop()?.split(';').shift() || 'en'
-    }
-    return 'en'
-  })
+  const locale = useLocale()
   const t = useTranslations('settings')
   const tDashboard = useTranslations('dashboard')
 
-  const handleLanguageChange = (locale: string) => {
-    setCurrentLocale(locale)
+  const handleLanguageChange = (nextLocale: string) => {
     setIsLangOpen(false)
     const redirectTo = `${window.location.pathname}${window.location.search}`
     window.location.assign(
-      `/api/locale?locale=${encodeURIComponent(locale)}&redirect=${encodeURIComponent(redirectTo)}`
+      `/api/locale?locale=${encodeURIComponent(nextLocale)}&redirect=${encodeURIComponent(redirectTo)}`
     )
   }
 
@@ -87,7 +78,7 @@ export default function Header({
     const next = current === 'demo' ? 'production' : 'demo'
     localStorage.setItem(MECHANIC_OPERATION_MODE_KEY, next)
     window.dispatchEvent(new CustomEvent('operation-mode-changed', { detail: { mode: next } }))
-    setModeToast(`Mode switched to ${next.toUpperCase()}`)
+    setModeToast(next === 'demo' ? t('globeModeToastDemo') : t('globeModeToastProduction'))
     if (modeToastTimerRef.current !== null) {
       window.clearTimeout(modeToastTimerRef.current)
     }
@@ -122,7 +113,6 @@ export default function Header({
       }
       return
     }
-    if (onRightButtonTripleClick) return
     setIsLangOpen((prev) => !prev)
   }
 
@@ -194,7 +184,7 @@ export default function Header({
             </button>
             
             {/* Language Dropdown */}
-            {!onRightButtonTripleClick && isLangOpen && (
+            {isLangOpen && (
               <>
                 <div 
                   className="fixed inset-0 z-40"
@@ -209,7 +199,7 @@ export default function Header({
                         handleLanguageChange(lang.code)
                       }}
                       className={`w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors ${
-                        currentLocale === lang.code 
+                        locale === lang.code 
                           ? 'bg-zinc-100 text-zinc-900 font-medium' 
                           : 'text-gray-700'
                       }`}

@@ -322,7 +322,6 @@ export default function MechanicPage() {
     customerEmailPlaceholderRaw === 'mechanic.customerEmailPlaceholder'
       ? 'customer@example.com'
       : customerEmailPlaceholderRaw
-  const modeSwitchHint = 'Triple tap the globe icon to switch Demo/Production mode.'
   const targetMode = operationMode === 'production' ? 'demo' : 'production'
 
   useEffect(() => {
@@ -370,10 +369,10 @@ export default function MechanicPage() {
     setError(null)
     if (nextMode === 'demo') {
       setDemoStatus('pending')
-      setMessage('Demo mode enabled. Sample maintenance job loaded.')
+      setMessage(t('demoModeEnabledMessage'))
       return
     }
-    setMessage('Production mode enabled. Demo sample is hidden.')
+    setMessage(t('productionModeEnabledMessage'))
   }
 
   const readFiles = async (files: FileList | null, target: 'before' | 'after') => {
@@ -626,19 +625,18 @@ export default function MechanicPage() {
         <section className="rounded-xl bg-white p-4 shadow-sm">
           <p className="text-sm text-gray-600" style={{ marginLeft: '6px' }}>{subtitle}</p>
           <p className="mt-1 text-xs font-semibold text-zinc-700" style={{ marginLeft: '6px' }}>
-            Mode: {operationMode === 'demo' ? 'DEMO' : 'PRODUCTION'}
+            {t('operationModeLabel')}{' '}
+            {operationMode === 'demo' ? t('operationModeDemo') : t('operationModeProduction')}
           </p>
           <p className="mt-1 text-xs text-gray-500" style={{ marginLeft: '6px' }}>
-            {modeSwitchHint}
+            {t('modeSwitchHint')}
           </p>
         </section>
         {!loading && isDemoMode ? (
           <section className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700 shadow-sm">
-            <p style={{ marginLeft: '6px' }}>
-              Demo mode is ON. Sample maintenance data is shown for workflow practice.
-            </p>
+            <p style={{ marginLeft: '6px' }}>{t('demoModeBannerBody')}</p>
             <p className="mt-1 text-xs text-amber-700/80" style={{ marginLeft: '6px' }}>
-              {modeSwitchHint}
+              {t('modeSwitchHint')}
             </p>
           </section>
         ) : null}
@@ -712,7 +710,7 @@ export default function MechanicPage() {
                       {t('scheduleLabel')}: {formatScheduleLabel(request)}
                     </p>
                     <p className={`mt-1 text-xs ${isSelected ? 'text-white/80' : 'text-gray-500'}`} style={{ marginLeft: '6px' }}>
-                      Assigned mechanic: {assignedMechanicName || '-'}
+                      {t('assignedMechanicLabel')} {assignedMechanicName || '-'}
                     </p>
                     {isAssignedToCurrentMechanic ? (
                       <p
@@ -721,7 +719,7 @@ export default function MechanicPage() {
                         }`}
                         style={{ marginLeft: '6px' }}
                       >
-                        Assigned to you
+                        {t('assignedToYouBadge')}
                       </p>
                     ) : null}
                   </button>
@@ -742,7 +740,7 @@ export default function MechanicPage() {
                     {t('scheduleLabel')}: {formatScheduleLabel(selectedRequest)}
                   </p>
                   <p className="mt-1 text-xs text-gray-500" style={{ marginLeft: '6px' }}>
-                    Assigned mechanic: {selectedRequest.vendor_name?.trim() || '-'}
+                    {t('assignedMechanicLabel')} {selectedRequest.vendor_name?.trim() || '-'}
                   </p>
                 </div>
 
@@ -1125,7 +1123,7 @@ export default function MechanicPage() {
                     >
                       <span className="inline-flex items-center gap-2">
                         <Wrench className="h-4 w-4" />
-                        {saving ? t('saving') : 'Save and Get the Sign'}
+                        {saving ? t('saving') : t('saveAndGetSign')}
                       </span>
                     </button>
                   </div>
@@ -1148,18 +1146,24 @@ export default function MechanicPage() {
           }}
         >
           <div className="mx-auto mt-[12vh] w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
-            <h2 className="text-base font-bold text-zinc-900">Switch app mode?</h2>
+            <h2 className="text-base font-bold text-zinc-900">{t('switchModeTitle')}</h2>
             <p className="mt-2 text-sm text-zinc-600">
               {targetMode === 'production'
-                ? 'Demo sample will be hidden and only real scheduled jobs will be used.'
-                : 'Demo sample will be enabled for workflow practice.'}
+                ? t('switchModeTargetProductionDetail')
+                : t('switchModeTargetDemoDetail')}
             </p>
             <div className="mt-3 rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700">
               <p>
-                Current: <span className="font-semibold">{operationMode.toUpperCase()}</span>
+                {t('switchModeCurrent')}{' '}
+                <span className="font-semibold">
+                  {operationMode === 'demo' ? t('operationModeDemo') : t('operationModeProduction')}
+                </span>
               </p>
               <p className="mt-1">
-                Target: <span className="font-semibold">{targetMode.toUpperCase()}</span>
+                {t('switchModeTarget')}{' '}
+                <span className="font-semibold">
+                  {targetMode === 'production' ? t('operationModeProduction') : t('operationModeDemo')}
+                </span>
               </p>
             </div>
             <div className="mt-4 grid grid-cols-2 gap-2">
@@ -1168,14 +1172,14 @@ export default function MechanicPage() {
                 onClick={closeModeConfirmDialog}
                 className="rounded-xl border border-zinc-300 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-800"
               >
-                Cancel
+                {t('switchModeCancel')}
               </button>
               <button
                 type="button"
                 onClick={handleToggleOperationMode}
                 className="rounded-xl bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-white"
               >
-                {targetMode === 'production' ? 'Switch to Production' : 'Switch to Demo'}
+                {targetMode === 'production' ? t('switchModeConfirmProduction') : t('switchModeConfirmDemo')}
               </button>
             </div>
           </div>

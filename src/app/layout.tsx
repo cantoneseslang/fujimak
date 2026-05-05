@@ -40,7 +40,7 @@ export default async function RootLayout({
         <link rel="apple-touch-icon" href="/images/fujimak-rogo.png" />
       </head>
       <body suppressHydrationWarning>
-        <NextIntlClientProvider messages={messages}>
+        <NextIntlClientProvider locale={locale} messages={messages}>
           <VisitorTracker />
           {children}
         </NextIntlClientProvider>

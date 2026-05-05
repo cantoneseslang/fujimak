@@ -8,6 +8,7 @@ import {
   rankLabel,
   type MaintenanceReportFormSnapshot,
 } from '@/lib/maintenanceReportForm'
+import { partitionMechanicEvidenceByType } from '@/lib/mechanicEvidenceFromAttachments'
 
 type ReportAttachment = {
   name: string
@@ -157,8 +158,11 @@ export async function buildMechanicWorkReportPdf(params: {
 
   const attachments = parseAttachments(request.attachments)
   const overviewImages = attachments.filter((i) => i.source === 'mechanic_overview' && i.type === 'image').slice(0, 2)
-  const beforeImages = attachments.filter((i) => i.source === 'mechanic_before' && i.type === 'image')
-  const afterImages = attachments.filter((i) => i.source === 'mechanic_after' && i.type === 'image')
+  const { before: beforeImages, after: afterImages } = partitionMechanicEvidenceByType(
+    attachments,
+    asText(request.id),
+    'image'
+  )
 
   const doc = new PDFDocument({
     size: 'A4',

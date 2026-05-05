@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Header from '@/components/Header'
 import type { MaintenanceRequestRecord } from '@/lib/maintenance'
+import { partitionMechanicEvidenceByType } from '@/lib/mechanicEvidenceFromAttachments'
 
 type WorkAttachment = {
   name: string
@@ -88,10 +89,11 @@ export default function ManagementInvoicePage() {
     void load()
   }, [requestId])
 
-  const beforeImages = useMemo(
-    () => parseAttachments(record?.attachments).filter((item) => item.source === 'mechanic_before' && item.type === 'image'),
-    [record?.attachments]
-  )
+  const beforeImages = useMemo(() => {
+    const rows = parseAttachments(record?.attachments)
+    const id = asText(record?.id)
+    return partitionMechanicEvidenceByType(rows, id, 'image').before
+  }, [record?.attachments, record?.id])
 
   const formattedAmount = useMemo(() => {
     const parsed = parseAmount(invoiceAmount)

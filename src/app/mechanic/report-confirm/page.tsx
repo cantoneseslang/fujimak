@@ -19,6 +19,7 @@ import {
   buildMaintenanceReportFormState,
 } from '@/lib/maintenanceReportForm'
 import { clearMechanicReportDraft, loadMechanicReportDraft } from '@/lib/mechanicReportDraft'
+import { partitionMechanicEvidenceByType } from '@/lib/mechanicEvidenceFromAttachments'
 
 type WorkAttachment = {
   name: string
@@ -305,21 +306,14 @@ export default function MechanicReportConfirmPage() {
   }, [])
 
   const attachments = useMemo(() => parseAttachments(record?.attachments), [record?.attachments])
-  const beforeImages = useMemo(
-    () => attachments.filter((item) => item.source === 'mechanic_before' && item.type === 'image'),
-    [attachments]
+  const evidenceRequestId = record?.id ?? ''
+  const { before: beforeImages, after: afterImages } = useMemo(
+    () => partitionMechanicEvidenceByType(attachments, evidenceRequestId, 'image'),
+    [attachments, evidenceRequestId]
   )
-  const afterImages = useMemo(
-    () => attachments.filter((item) => item.source === 'mechanic_after' && item.type === 'image'),
-    [attachments]
-  )
-  const beforeVideos = useMemo(
-    () => attachments.filter((item) => item.source === 'mechanic_before' && item.type === 'video'),
-    [attachments]
-  )
-  const afterVideos = useMemo(
-    () => attachments.filter((item) => item.source === 'mechanic_after' && item.type === 'video'),
-    [attachments]
+  const { before: beforeVideos, after: afterVideos } = useMemo(
+    () => partitionMechanicEvidenceByType(attachments, evidenceRequestId, 'video'),
+    [attachments, evidenceRequestId]
   )
 
   const startTime = getLatestStartTime(record?.remarks ?? null)
@@ -1004,7 +998,7 @@ export default function MechanicReportConfirmPage() {
                           <p className="mt-2 text-xs leading-relaxed text-zinc-500" style={{ marginLeft: '6px' }}>
                             このプレビューとPDFは、Before / After{' '}
                             <strong className="font-medium text-zinc-600">それぞれ最新の1枚</strong>
-                            のみ表示します（複数ある場合は、いちばん後から追加された写真）。
+                            のみ表示します（保存パスの before／after で区分し、複数ある場合はファイル名の時刻が新しいもの）。
                             {extraBeforeCount > 0 ? ` Before ほか${extraBeforeCount}枚` : ''}
                             {extraBeforeCount > 0 && extraAfterCount > 0 ? '、' : ''}
                             {extraAfterCount > 0 ? ` After ほか${extraAfterCount}枚` : ''}

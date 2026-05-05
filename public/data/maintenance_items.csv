@@ -1,0 +1,44 @@
+id,category_id,name_ja,name_en,name_zh,estimated_time,flc_rq
+lighting,all-area,照明交換、修繕,Lighting Repair/Replacement,照明維修更換,1~2週前後,true
+formica,all-area,FORMICA修繕,FORMICA Repair,FORMICA維修,1~2週前後,false
+wood-furniture,all-area,木器家具修繕,Wooden Furniture Repair,木器家具維修,1ヶ月以内,true
+sus-furniture,all-area,SUS/木器家具発注,SUS/Wood Furniture Order,SUS/木器家具訂購,1ヶ月以内,true
+baseboard,all-area,巾木修繕,Baseboard Repair,踢腳板維修,1~2週前後,true
+pvc-floor,all-area,PVC床タイル修繕・交換,PVC Floor Tile Repair,PVC地板維修更換,1~2週前後,true
+wall-glass,all-area,壁・ガラス関連,Wall/Glass Related,牆壁玻璃相關,1~2週前後,true
+ceiling,all-area,天井塗装・スケルトン修繕,Ceiling Paint/Skeleton Repair,天花板油漆維修,1~2週前後,true
+ac-ventilation,all-area,エアコン、除湿器、通風関連修繕,AC/Dehumidifier/Ventilation,空調除濕通風維修,1~2日以内,true
+door,all-area,扉修繕,Door Repair,門維修,1週間以内,true
+water-cooler,all-area,冷水機修理,Water Cooler Repair,冷水機維修,1週間以内,false
+water-purifier,all-area,浄水器関連,Water Purifier Related,淨水器相關,1~2日以内,false
+monitor,all-area,モニター関連,Monitor Related,監視器相關,1週間以内,false
+speaker,all-area,スピーカー関連,Speaker Related,揚聲器相關,1週間以内,false
+fire-equipment,all-area,消防設備関連,Fire Equipment Related,消防設備相關,1~2日以内,true
+drain-pump,all-area,排水ポンプ関連,Drain Pump Related,排水泵相關,1~2日以内,false
+showcase-fridge,all-area,ショーケース冷蔵庫修理,Showcase Refrigerator Repair,展示櫃冰箱維修,1週間以内,false
+caulking,all-area,コーキング手配,Caulking Arrangement,填縫安排,1~2週前後,false
+signage,exterior,看板・照明修理,Signage/Lighting Repair,招牌照明維修,1週間以内,false
+shutter,exterior,シャッター修繕,Shutter Repair,捲閘維修,1~2日以内,false
+grease-trap,exterior,グリーストラップ関連,Grease Trap Related,隔油池相關,1~2日以内,false
+banner,exterior,広告banner関連,Advertising Banner,廣告橫幅相關,1週間以内,false
+hoshizaki,kitchen,ホシザキ冷凍冷蔵庫、食器洗浄機修理,Hoshizaki Fridge/Dishwasher,Hoshizaki冰箱洗碗機維修,1週間以内,false
+noodle-boiler,kitchen,茹で麺機修理,Noodle Boiler Repair,煮麵機維修,1週間以内,false
+hobart,kitchen,Hobart食器洗浄機修理,Hobart Dishwasher Repair,Hobart洗碗機維修,1週間以内,false
+freezer-stocker,kitchen,冷凍ストッカー修理,Freezer Stocker Repair,冷凍庫維修,1週間以内,false
+microwave,kitchen,電子レンジ修理,Microwave Repair,微波爐維修,1週間以内,false
+water-heater,kitchen,給湯器修理,Water Heater Repair,熱水器維修,1週間以内,false
+ih-stove,kitchen,IHコンロ交換,IH Stove Replacement,IH爐具更換,1週間以内,false
+heater,kitchen,ヒーター修理,Heater Repair,加熱器維修,1~2週前後,false
+welding,kitchen,溶接手配,Welding Arrangement,焊接安排,1~2週前後,false
+faucet,kitchen,水栓修繕,Faucet Repair,水龍頭維修,1週間以内,false
+fryer,kitchen,フライヤー修理,Fryer Repair,油炸機維修,1週間以内,false
+warmer,kitchen,ウォーマー修理,Warmer Repair,保溫器維修,1週間以内,false
+drain-pipe,kitchen,排水管修繕,Drain Pipe Repair,排水管維修,1~2日以内,false
+kitchen-floor,kitchen,床タイル修繕,Floor Tile Repair,地板磁磚維修,1週間以内,true
+outlet-cover,kitchen,コンセントカバー修理,Outlet Cover Repair,插座蓋維修,1週間以内,true
+salamander,kitchen,サラマンダー修理,Salamander Repair,明火烤爐維修,1週間以内,false
+work-table,kitchen,作業台修理,Work Table Repair,工作檯維修,1週間以内,true
+ice-maker,pantry,製氷機修理,Ice Maker Repair,製冰機維修,1週間以内,false
+toilet-bowl,toilet,便器修繕,Toilet Bowl Repair,馬桶維修,1週間以内,true
+paper-holder,toilet,ペーパーホルダー修繕,Paper Holder Repair,紙巾架維修,1~2週前後,true
+locker-door,staff-room,更衣室扉修繕,Locker Room Door Repair,更衣室門維修,1~2週前後,true

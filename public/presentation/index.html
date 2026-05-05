@@ -1,0 +1,1051 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>壽司郎香港 店舗メンテナンス管理システム 提案書</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Noto Sans JP', sans-serif;
+      background: #1a1a2e;
+      color: #fff;
+      overflow: hidden;
+    }
+
+    .slide {
+      display: none;
+      width: 100vw;
+      height: 100vh;
+      padding: 60px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .slide.active {
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Slide 1: Title */
+    .slide-1 {
+      background: linear-gradient(135deg, #C41E3A 0%, #8B0000 100%);
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+    }
+
+    .slide-1 .logo {
+      width: 200px;
+      margin-bottom: 40px;
+      filter: brightness(0) invert(1);
+    }
+
+    .slide-1 h1 {
+      font-size: 3.5rem;
+      font-weight: 900;
+      margin-bottom: 20px;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
+
+    .slide-1 h2 {
+      font-size: 2rem;
+      font-weight: 500;
+      opacity: 0.9;
+      margin-bottom: 60px;
+    }
+
+    .slide-1 .subtitle {
+      font-size: 1.5rem;
+      opacity: 0.8;
+      border-top: 2px solid rgba(255,255,255,0.3);
+      padding-top: 30px;
+    }
+
+    /* Slide 2: DX Vision */
+    .slide-2 {
+      background: linear-gradient(135deg, #16213e 0%, #0f3460 100%);
+    }
+
+    .slide-header {
+      margin-bottom: 40px;
+    }
+
+    .slide-header h2 {
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: #C41E3A;
+      margin-bottom: 10px;
+    }
+
+    .slide-header .line {
+      width: 100px;
+      height: 4px;
+      background: #C41E3A;
+    }
+
+    .vision-quote {
+      background: rgba(255,255,255,0.05);
+      border-left: 4px solid #C41E3A;
+      padding: 30px 40px;
+      margin-bottom: 40px;
+      font-size: 1.3rem;
+      line-height: 2;
+    }
+
+    .vision-quote strong {
+      color: #C41E3A;
+    }
+
+    .dx-keywords {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 30px;
+      flex: 1;
+    }
+
+    .dx-keyword {
+      background: rgba(196, 30, 58, 0.1);
+      border: 2px solid rgba(196, 30, 58, 0.3);
+      border-radius: 16px;
+      padding: 30px;
+      text-align: center;
+    }
+
+    .dx-keyword .icon {
+      font-size: 3rem;
+      margin-bottom: 20px;
+    }
+
+    .dx-keyword h3 {
+      font-size: 1.2rem;
+      color: #C41E3A;
+      margin-bottom: 15px;
+    }
+
+    .dx-keyword p {
+      font-size: 1rem;
+      opacity: 0.8;
+      line-height: 1.6;
+    }
+
+    /* Slide 3: Current Issues */
+    .slide-3 {
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    }
+
+    .issues-container {
+      display: flex;
+      gap: 40px;
+      flex: 1;
+    }
+
+    .issue-card {
+      flex: 1;
+      background: rgba(255,255,255,0.05);
+      border-radius: 20px;
+      padding: 40px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .issue-card.before {
+      border: 2px solid #ff6b6b;
+    }
+
+    .issue-card.after {
+      border: 2px solid #4ecdc4;
+    }
+
+    .issue-card h3 {
+      font-size: 1.8rem;
+      margin-bottom: 30px;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+
+    .issue-card.before h3 {
+      color: #ff6b6b;
+    }
+
+    .issue-card.after h3 {
+      color: #4ecdc4;
+    }
+
+    .issue-list {
+      list-style: none;
+      flex: 1;
+    }
+
+    .issue-list li {
+      padding: 20px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      font-size: 1.1rem;
+      display: flex;
+      align-items: flex-start;
+      gap: 15px;
+    }
+
+    .issue-list li:last-child {
+      border-bottom: none;
+    }
+
+    .issue-list .icon {
+      font-size: 1.5rem;
+      flex-shrink: 0;
+    }
+
+    /* Slide 4: Solution Overview */
+    .slide-4 {
+      background: linear-gradient(135deg, #0f3460 0%, #16213e 100%);
+    }
+
+    .solution-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 30px;
+      flex: 1;
+    }
+
+    .solution-card {
+      background: linear-gradient(135deg, rgba(196, 30, 58, 0.2), rgba(196, 30, 58, 0.05));
+      border-radius: 20px;
+      padding: 35px;
+      border: 1px solid rgba(196, 30, 58, 0.3);
+    }
+
+    .solution-card .number {
+      display: inline-block;
+      width: 50px;
+      height: 50px;
+      background: #C41E3A;
+      border-radius: 50%;
+      text-align: center;
+      line-height: 50px;
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 20px;
+    }
+
+    .solution-card h3 {
+      font-size: 1.4rem;
+      margin-bottom: 15px;
+      color: #fff;
+    }
+
+    .solution-card p {
+      font-size: 1rem;
+      opacity: 0.8;
+      line-height: 1.8;
+    }
+
+    /* Slide 5: System Features */
+    .slide-5 {
+      background: linear-gradient(135deg, #16213e 0%, #1a1a2e 100%);
+    }
+
+    .features-container {
+      display: flex;
+      gap: 30px;
+      flex: 1;
+    }
+
+    .feature-column {
+      flex: 1;
+      background: rgba(255,255,255,0.03);
+      border-radius: 20px;
+      padding: 30px;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .feature-column h3 {
+      font-size: 1.3rem;
+      color: #C41E3A;
+      margin-bottom: 25px;
+      padding-bottom: 15px;
+      border-bottom: 2px solid rgba(196, 30, 58, 0.3);
+    }
+
+    .feature-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 15px;
+      padding: 15px 0;
+    }
+
+    .feature-item .check {
+      width: 24px;
+      height: 24px;
+      background: #C41E3A;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-size: 0.8rem;
+    }
+
+    .feature-item p {
+      font-size: 1rem;
+      line-height: 1.6;
+    }
+
+    /* Slide 6: Coverage */
+    .slide-6 {
+      background: linear-gradient(135deg, #1a1a2e 0%, #0f3460 100%);
+    }
+
+    .coverage-container {
+      display: flex;
+      gap: 40px;
+      flex: 1;
+      align-items: center;
+    }
+
+    .coverage-stats {
+      flex: 1;
+    }
+
+    .stat-card {
+      background: rgba(196, 30, 58, 0.1);
+      border-radius: 20px;
+      padding: 30px 40px;
+      margin-bottom: 20px;
+      border: 1px solid rgba(196, 30, 58, 0.3);
+    }
+
+    .stat-card h3 {
+      font-size: 1rem;
+      opacity: 0.7;
+      margin-bottom: 10px;
+    }
+
+    .stat-card .number {
+      font-size: 4rem;
+      font-weight: 900;
+      color: #C41E3A;
+    }
+
+    .stat-card .unit {
+      font-size: 1.5rem;
+      opacity: 0.8;
+    }
+
+    .region-breakdown {
+      flex: 1;
+    }
+
+    .region-item {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      margin-bottom: 25px;
+    }
+
+    .region-item .label {
+      width: 100px;
+      font-size: 1.1rem;
+    }
+
+    .region-item .bar-container {
+      flex: 1;
+      height: 40px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 20px;
+      overflow: hidden;
+    }
+
+    .region-item .bar {
+      height: 100%;
+      background: linear-gradient(90deg, #C41E3A, #ff6b6b);
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding-right: 15px;
+      font-weight: 700;
+    }
+
+    /* Slide 7: Partners */
+    .slide-7 {
+      background: linear-gradient(135deg, #0f3460 0%, #16213e 100%);
+    }
+
+    .partners-container {
+      display: flex;
+      gap: 60px;
+      flex: 1;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .partner-card {
+      width: 400px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 24px;
+      padding: 50px;
+      text-align: center;
+      border: 2px solid rgba(255,255,255,0.1);
+    }
+
+    .partner-card .logo-placeholder {
+      width: 150px;
+      height: 80px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 12px;
+      margin: 0 auto 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      font-weight: 700;
+    }
+
+    .partner-card h3 {
+      font-size: 1.5rem;
+      margin-bottom: 20px;
+    }
+
+    .partner-card p {
+      font-size: 1rem;
+      opacity: 0.7;
+      line-height: 1.8;
+    }
+
+    /* Slide 8: Schedule */
+    .slide-8 {
+      background: linear-gradient(135deg, #16213e 0%, #1a1a2e 100%);
+    }
+
+    .timeline {
+      display: flex;
+      flex: 1;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .phase {
+      flex: 1;
+      position: relative;
+    }
+
+    .phase-card {
+      background: rgba(255,255,255,0.05);
+      border-radius: 20px;
+      padding: 40px;
+      border: 2px solid rgba(196, 30, 58, 0.3);
+      height: 100%;
+    }
+
+    .phase-card h3 {
+      font-size: 1.5rem;
+      color: #C41E3A;
+      margin-bottom: 10px;
+    }
+
+    .phase-card .duration {
+      font-size: 1rem;
+      opacity: 0.6;
+      margin-bottom: 25px;
+    }
+
+    .phase-card .target {
+      background: rgba(196, 30, 58, 0.2);
+      padding: 15px 20px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+    }
+
+    .phase-card .target strong {
+      color: #C41E3A;
+    }
+
+    .phase-card ul {
+      list-style: none;
+    }
+
+    .phase-card ul li {
+      padding: 10px 0;
+      padding-left: 25px;
+      position: relative;
+      font-size: 1rem;
+      opacity: 0.9;
+    }
+
+    .phase-card ul li::before {
+      content: "→";
+      position: absolute;
+      left: 0;
+      color: #C41E3A;
+    }
+
+    .phase-arrow {
+      font-size: 3rem;
+      color: #C41E3A;
+      flex-shrink: 0;
+    }
+
+    /* Slide 9: Expected Benefits */
+    .slide-9 {
+      background: linear-gradient(135deg, #1a1a2e 0%, #0f3460 100%);
+    }
+
+    .benefits-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 30px;
+      flex: 1;
+    }
+
+    .benefit-card {
+      background: linear-gradient(180deg, rgba(196, 30, 58, 0.15), rgba(196, 30, 58, 0.05));
+      border-radius: 20px;
+      padding: 40px 30px;
+      text-align: center;
+      border: 1px solid rgba(196, 30, 58, 0.2);
+    }
+
+    .benefit-card .icon {
+      font-size: 4rem;
+      margin-bottom: 25px;
+    }
+
+    .benefit-card h3 {
+      font-size: 1.3rem;
+      color: #C41E3A;
+      margin-bottom: 20px;
+    }
+
+    .benefit-card p {
+      font-size: 1rem;
+      opacity: 0.8;
+      line-height: 1.8;
+    }
+
+    /* Slide 10: Closing */
+    .slide-10 {
+      background: linear-gradient(135deg, #C41E3A 0%, #8B0000 100%);
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+    }
+
+    .slide-10 h2 {
+      font-size: 3rem;
+      font-weight: 900;
+      margin-bottom: 40px;
+    }
+
+    .slide-10 .message {
+      font-size: 1.8rem;
+      opacity: 0.9;
+      margin-bottom: 60px;
+      line-height: 2;
+    }
+
+    .slide-10 .contact {
+      font-size: 1.2rem;
+      opacity: 0.8;
+    }
+
+    .slide-10 .company {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-top: 20px;
+    }
+
+    /* Navigation */
+    .nav {
+      position: fixed;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 15px;
+      z-index: 100;
+    }
+
+    .nav button {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.3);
+      background: rgba(0,0,0,0.3);
+      color: #fff;
+      font-size: 1.2rem;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .nav button:hover {
+      background: #C41E3A;
+      border-color: #C41E3A;
+    }
+
+    .page-indicator {
+      position: fixed;
+      bottom: 30px;
+      right: 30px;
+      font-size: 1rem;
+      opacity: 0.6;
+    }
+
+    /* Footer Logo */
+    .footer-logo {
+      position: absolute;
+      bottom: 30px;
+      left: 60px;
+      opacity: 0.3;
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+  <!-- Slide 1: Title -->
+  <div class="slide slide-1 active">
+    <img src="../images/logo.png" alt="Sushiro" class="logo">
+    <h1>店舗メンテナンス管理システム</h1>
+    <h2>Store Maintenance Management Platform</h2>
+    <p class="subtitle">壽司郎香港 全40店舗 一元管理プラットフォーム構築のご提案</p>
+  </div>
+
+  <!-- Slide 2: DX Vision -->
+  <div class="slide slide-2">
+    <div class="slide-header">
+      <h2>FOOD & LIFE COMPANIES DX戦略との整合</h2>
+      <div class="line"></div>
+    </div>
+    <div class="vision-quote">
+      <strong>「デジタルを活用し、社内のシステムユーザーや消費者が認識していない課題解決を行い、新規ビジネスモデルの構築を進める」</strong>
+      <br><br>
+      — FOOD & LIFE COMPANIES DX方針より
+    </div>
+    <div class="dx-keywords">
+      <div class="dx-keyword">
+        <div class="icon">🤝</div>
+        <h3>社外パートナー連携</h3>
+        <p>設備業者とのリアルタイムな情報共有プラットフォーム構築</p>
+      </div>
+      <div class="dx-keyword">
+        <div class="icon">⚡</div>
+        <h3>業務効率化</h3>
+        <p>メンテナンス依頼から完了まで全プロセスのデジタル化</p>
+      </div>
+      <div class="dx-keyword">
+        <div class="icon">📊</div>
+        <h3>店舗オペレーション最適化</h3>
+        <p>全店舗の設備状況を一元管理・可視化</p>
+      </div>
+    </div>
+    <div class="footer-logo">© LIFESUPPORT (HK) LIMITED</div>
+  </div>
+
+  <!-- Slide 3: Current Issues -->
+  <div class="slide slide-3">
+    <div class="slide-header">
+      <h2>現状の課題と解決策</h2>
+      <div class="line"></div>
+    </div>
+    <div class="issues-container">
+      <div class="issue-card before">
+        <h3><span class="icon">❌</span> 現状（Before）</h3>
+        <ul class="issue-list">
+          <li>
+            <span class="icon">📞</span>
+            <span>各店舗が個別に業者へ電話連絡<br>→ 連絡漏れ・対応遅延のリスク</span>
+          </li>
+          <li>
+            <span class="icon">📋</span>
+            <span>メンテナンス状況が店舗ごとに分散<br>→ 全体把握が困難</span>
+          </li>
+          <li>
+            <span class="icon">📝</span>
+            <span>紙ベースでの記録・報告<br>→ 履歴検索・分析が不可能</span>
+          </li>
+          <li>
+            <span class="icon">🔄</span>
+            <span>日程調整は電話でのやり取り<br>→ 工数・時間のロス</span>
+          </li>
+        </ul>
+      </div>
+      <div class="issue-card after">
+        <h3><span class="icon">✓</span> 導入後（After）</h3>
+        <ul class="issue-list">
+          <li>
+            <span class="icon">📱</span>
+            <span>アプリから統一フォーマットで依頼<br>→ 確実・迅速な情報伝達</span>
+          </li>
+          <li>
+            <span class="icon">🖥️</span>
+            <span>管理画面で全40店舗を一元管理<br>→ リアルタイムで状況把握</span>
+          </li>
+          <li>
+            <span class="icon">💾</span>
+            <span>デジタルで履歴管理・検索可能<br>→ データ活用・分析が可能</span>
+          </li>
+          <li>
+            <span class="icon">📅</span>
+            <span>アプリ内で日程調整・承認<br>→ 調整工数の大幅削減</span>
+          </li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-logo">© LIFESUPPORT (HK) LIMITED</div>
+  </div>
+
+  <!-- Slide 4: Solution Overview -->
+  <div class="slide slide-4">
+    <div class="slide-header">
+      <h2>システム概要</h2>
+      <div class="line"></div>
+    </div>
+    <div class="solution-grid">
+      <div class="solution-card">
+        <div class="number">1</div>
+        <h3>メンテナンスコール</h3>
+        <p>6ステップで簡単に修理依頼。写真添付・希望日程指定まで一気通貫でデジタル化。43種類のメンテナンス項目に対応。</p>
+      </div>
+      <div class="solution-card">
+        <div class="number">2</div>
+        <h3>リアルタイム通知</h3>
+        <p>業者からの日程変更提案をアプリで受信。承認・再調整もワンタップで完了。電話不要でスムーズな調整を実現。</p>
+      </div>
+      <div class="solution-card">
+        <div class="number">3</div>
+        <h3>全店舗ダッシュボード</h3>
+        <p>管理者画面で40店舗のメンテナンス状況を一目で把握。ガントチャート形式で進捗管理が可能。</p>
+      </div>
+      <div class="solution-card">
+        <div class="number">4</div>
+        <h3>多言語対応</h3>
+        <p>日本語・繁體中文・Englishの3言語に対応。香港現地スタッフから本社管理者まで言語バリアなく利用可能。</p>
+      </div>
+    </div>
+    <div class="footer-logo">© LIFESUPPORT (HK) LIMITED</div>
+  </div>
+
+  <!-- Slide 5: System Features -->
+  <div class="slide slide-5">
+    <div class="slide-header">
+      <h2>主要機能詳細</h2>
+      <div class="line"></div>
+    </div>
+    <div class="features-container">
+      <div class="feature-column">
+        <h3>🏪 店舗スタッフ向け</h3>
+        <div class="feature-item">
+          <div class="check">✓</div>
+          <p>エリア選択（全域/店外/厨房/配膳間/洗手間/員工室）</p>
+        </div>
+        <div class="feature-item">
+          <div class="check">✓</div>
+          <p>43種類のメンテナンス項目から選択</p>
+        </div>
+        <div class="feature-item">
+          <div class="check">✓</div>
+          <p>緊急度選択（緊急/普通/見積もり）</p>
+        </div>
+        <div class="feature-item">
+          <div class="check">✓</div>
+          <p>写真添付機能（カメラ/ギャラリー）</p>
+        </div>
+        <div class="feature-item">
+          <div class="check">✓</div>
+          <p>カレンダーで希望日時を選択</p>
+        </div>
+        <div class="feature-item">
+          <div class="check">✓</div>
+          <p>業者からの通知を受信・承認</p>
+        </div>
+      </div>
+      <div class="feature-column">
+        <h3>👔 管理者向け</h3>
+        <div class="feature-item">
+          <div class="check">✓</div>
+          <p>全40店舗のメンテナンス状況を一覧表示</p>
+        </div>
+        <div class="feature-item">
+          <div class="check">✓</div>
+          <p>ガントチャート形式のカレンダービュー</p>
+        </div>
+        <div class="feature-item">
+          <div class="check">✓</div>
+          <p>ステータス別フィルター（待機中/進行中/完了）</p>
+        </div>
+        <div class="feature-item">
+          <div class="check">✓</div>
+          <p>店舗検索・地区別絞り込み</p>
+        </div>
+        <div class="feature-item">
+          <div class="check">✓</div>
+          <p>無限スクロールで過去〜未来の予定を確認</p>
+        </div>
+        <div class="feature-item">
+          <div class="check">✓</div>
+          <p>緊急度による色分け表示</p>
+        </div>
+      </div>
+      <div class="feature-column">
+        <h3>🔧 業者連携</h3>
+        <div class="feature-item">
+          <div class="check">✓</div>
+          <p>依頼内容の自動通知</p>
+        </div>
+        <div class="feature-item">
+          <div class="check">✓</div>
+          <p>日程変更提案機能</p>
+        </div>
+        <div class="feature-item">
+          <div class="check">✓</div>
+          <p>作業完了報告</p>
+        </div>
+        <div class="feature-item">
+          <div class="check">✓</div>
+          <p>履歴・実績の蓄積</p>
+        </div>
+        <div class="feature-item">
+          <div class="check">✓</div>
+          <p>担当業者の設定管理</p>
+        </div>
+        <div class="feature-item">
+          <div class="check">✓</div>
+          <p>メール通知連携</p>
+        </div>
+      </div>
+    </div>
+    <div class="footer-logo">© LIFESUPPORT (HK) LIMITED</div>
+  </div>
+
+  <!-- Slide 6: Coverage -->
+  <div class="slide slide-6">
+    <div class="slide-header">
+      <h2>対象店舗</h2>
+      <div class="line"></div>
+    </div>
+    <div class="coverage-container">
+      <div class="coverage-stats">
+        <div class="stat-card">
+          <h3>香港全域</h3>
+          <span class="number">40</span>
+          <span class="unit">店舗</span>
+        </div>
+        <div class="stat-card">
+          <h3>メンテナンス項目</h3>
+          <span class="number">43</span>
+          <span class="unit">種類</span>
+        </div>
+      </div>
+      <div class="region-breakdown">
+        <div class="region-item">
+          <span class="label">新界</span>
+          <div class="bar-container">
+            <div class="bar" style="width: 50%;">20店舗</div>
+          </div>
+        </div>
+        <div class="region-item">
+          <span class="label">九龍</span>
+          <div class="bar-container">
+            <div class="bar" style="width: 40%;">16店舗</div>
+          </div>
+        </div>
+        <div class="region-item">
+          <span class="label">香港島</span>
+          <div class="bar-container">
+            <div class="bar" style="width: 10%;">4店舗</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="footer-logo">© LIFESUPPORT (HK) LIMITED</div>
+  </div>
+
+  <!-- Slide 7: Partners -->
+  <div class="slide slide-7">
+    <div class="slide-header">
+      <h2>連携パートナー</h2>
+      <div class="line"></div>
+    </div>
+    <div class="partners-container">
+      <div class="partner-card">
+        <div class="logo-placeholder">LIFESUPPORT</div>
+        <h3>LIFESUPPORT (HK) LIMITED</h3>
+        <p>総合設備メンテナンス<br>電気・空調・給排水・内装など<br>幅広い設備に対応</p>
+      </div>
+      <div class="partner-card">
+        <div class="logo-placeholder">Fujimak</div>
+        <h3>Fujimak</h3>
+        <p>厨房機器メンテナンス<br>寿司レーン・冷蔵設備など<br>専門機器に対応</p>
+      </div>
+    </div>
+    <div class="footer-logo">© LIFESUPPORT (HK) LIMITED</div>
+  </div>
+
+  <!-- Slide 8: Schedule -->
+  <div class="slide slide-8">
+    <div class="slide-header">
+      <h2>導入スケジュール（案）</h2>
+      <div class="line"></div>
+    </div>
+    <div class="timeline">
+      <div class="phase">
+        <div class="phase-card">
+          <h3>Phase 1: パイロット導入</h3>
+          <p class="duration">期間: 1〜2ヶ月</p>
+          <div class="target">
+            <strong>対象: 5店舗</strong>（新界エリア選抜）
+          </div>
+          <ul>
+            <li>システム検証</li>
+            <li>ユーザーフィードバック収集</li>
+            <li>操作マニュアル作成</li>
+            <li>業者連携テスト</li>
+            <li>改善点の洗い出し・修正</li>
+          </ul>
+        </div>
+      </div>
+      <div class="phase-arrow">→</div>
+      <div class="phase">
+        <div class="phase-card">
+          <h3>Phase 2: 全店展開</h3>
+          <p class="duration">期間: 2〜3ヶ月</p>
+          <div class="target">
+            <strong>対象: 全40店舗</strong>
+          </div>
+          <ul>
+            <li>全店舗への導入・研修</li>
+            <li>本格運用開始</li>
+            <li>管理者ダッシュボード活用</li>
+            <li>効果測定・KPI設定</li>
+            <li>継続的改善サイクル確立</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="footer-logo">© LIFESUPPORT (HK) LIMITED</div>
+  </div>
+
+  <!-- Slide 9: Expected Benefits -->
+  <div class="slide slide-9">
+    <div class="slide-header">
+      <h2>期待される効果</h2>
+      <div class="line"></div>
+    </div>
+    <div class="benefits-grid">
+      <div class="benefit-card">
+        <div class="icon">⏱️</div>
+        <h3>連絡調整工数削減</h3>
+        <p>電話・メールでの個別連絡が不要に。アプリ内で依頼から日程調整まで完結。</p>
+      </div>
+      <div class="benefit-card">
+        <div class="icon">👁️</div>
+        <h3>全店舗可視化</h3>
+        <p>40店舗のメンテナンス状況をリアルタイムで一元管理。問題の早期発見が可能に。</p>
+      </div>
+      <div class="benefit-card">
+        <div class="icon">📈</div>
+        <h3>データ活用</h3>
+        <p>履歴の蓄積により、設備の傾向分析・予防保全計画の立案が可能に。</p>
+      </div>
+      <div class="benefit-card">
+        <div class="icon">🚀</div>
+        <h3>対応スピード向上</h3>
+        <p>写真付きで正確な情報を即座に共有。初動対応の迅速化を実現。</p>
+      </div>
+      <div class="benefit-card">
+        <div class="icon">💰</div>
+        <h3>コスト最適化</h3>
+        <p>重複発注の防止、緊急対応の最適化によるコスト削減効果。</p>
+      </div>
+      <div class="benefit-card">
+        <div class="icon">🌐</div>
+        <h3>言語バリア解消</h3>
+        <p>日本語・中国語・英語対応で、本社〜現地間のコミュニケーションが円滑に。</p>
+      </div>
+    </div>
+    <div class="footer-logo">© LIFESUPPORT (HK) LIMITED</div>
+  </div>
+
+  <!-- Slide 10: Closing -->
+  <div class="slide slide-10">
+    <h2>ご清聴ありがとうございました</h2>
+    <p class="message">
+      FOOD & LIFE COMPANIESのDX戦略に則り<br>
+      店舗オペレーションの最適化・自動化を実現する<br>
+      メンテナンス管理プラットフォームをご提案いたします
+    </p>
+    <p class="contact">お問い合わせ・ご質問は下記までお願いいたします</p>
+    <p class="company">LIFESUPPORT (HK) LIMITED</p>
+  </div>
+
+  <!-- Navigation -->
+  <div class="nav">
+    <button onclick="prevSlide()">←</button>
+    <button onclick="nextSlide()">→</button>
+  </div>
+  <div class="page-indicator">
+    <span id="currentPage">1</span> / <span id="totalPages">10</span>
+  </div>
+
+  <script>
+    let currentSlide = 0;
+    const slides = document.querySelectorAll('.slide');
+    const totalSlides = slides.length;
+
+    document.getElementById('totalPages').textContent = totalSlides;
+
+    function showSlide(index) {
+      slides.forEach((slide, i) => {
+        slide.classList.remove('active');
+        if (i === index) {
+          slide.classList.add('active');
+        }
+      });
+      document.getElementById('currentPage').textContent = index + 1;
+    }
+
+    function nextSlide() {
+      currentSlide = (currentSlide + 1) % totalSlides;
+      showSlide(currentSlide);
+    }
+
+    function prevSlide() {
+      currentSlide = (currentSlide - 1 + totalSlides) % totalSlides;
+      showSlide(currentSlide);
+    }
+
+    // Keyboard navigation
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === ' ') {
+        nextSlide();
+      } else if (e.key === 'ArrowLeft') {
+        prevSlide();
+      }
+    });
+
+    // Touch/swipe support
+    let touchStartX = 0;
+    document.addEventListener('touchstart', (e) => {
+      touchStartX = e.touches[0].clientX;
+    });
+
+    document.addEventListener('touchend', (e) => {
+      const touchEndX = e.changedTouches[0].clientX;
+      const diff = touchStartX - touchEndX;
+      if (Math.abs(diff) > 50) {
+        if (diff > 0) {
+          nextSlide();
+        } else {
+          prevSlide();
+        }
+      }
+    });
+  </script>
+</body>
+</html>

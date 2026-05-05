@@ -1,0 +1,10 @@
+# ロゴファイル - 変更禁止（バイナリとしてマーク、差分表示なし）
+public/images/logo.png binary -diff
+
+# 画像ファイル全般
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary

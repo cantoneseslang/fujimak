@@ -1,0 +1,82 @@
+#!/bin/bash
+# プリコミットフック - ロゴファイル変更検知
+# このスクリプトはgit commitの前に自動的に実行されます
+
+set -e
+
+# カラー定義
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+LOGO_PATH="sushiro-maintenance/public/images/logo.png"
+EXPECTED_HASH="756edf01dde89bc21f7daef59b012c17272c8dc6c73ccf0cd5fc7ab4f041bff0"
+
+echo "🔍 プリコミットチェックを実行中..."
+
+# 1. ロゴファイルがステージングされているかチェック
+if git diff --cached --name-only | grep -q "public/images/logo.png"; then
+    echo ""
+    echo -e "${RED}🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨${NC}"
+    echo ""
+    echo -e "${RED}❌ コミット拒否: ロゴファイルの変更は禁止されています！${NC}"
+    echo ""
+    echo -e "${YELLOW}対象ファイル: public/images/logo.png${NC}"
+    echo ""
+    echo "ロゴファイルの変更は重大問題となるため、禁止されています。"
+    echo ""
+    echo "変更を取り消すには:"
+    echo "  git checkout HEAD -- sushiro-maintenance/public/images/logo.png"
+    echo ""
+    echo "詳細は docs/BLACKLIST.md を参照してください。"
+    echo ""
+    echo -e "${RED}🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨${NC}"
+    echo ""
+    exit 1
+fi
+
+# 2. ロゴファイルのチェックサム検証（ファイルが存在する場合）
+if [ -f "$LOGO_PATH" ]; then
+    ACTUAL_HASH=$(shasum -a 256 "$LOGO_PATH" | awk '{print $1}')
+    
+    if [ "$ACTUAL_HASH" != "$EXPECTED_HASH" ]; then
+        echo ""
+        echo -e "${RED}🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨${NC}"
+        echo ""
+        echo -e "${RED}❌ 警告: ロゴファイルが正規のものではありません！${NC}"
+        echo ""
+        echo "期待されるハッシュ: $EXPECTED_HASH"
+        echo "実際のハッシュ:     $ACTUAL_HASH"
+        echo ""
+        echo "正規のロゴを復元してからコミットしてください。"
+        echo ""
+        echo -e "${RED}🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨${NC}"
+        echo ""
+        exit 1
+    fi
+fi
+
+# 3. 禁止パターンのチェック（既存のルール）
+echo "🔍 禁止パターンをチェック中..."
+
+# touchAction: 'none' のチェック
+if git diff --cached --name-only | xargs grep -l "touchAction.*none" 2>/dev/null | grep -q "app/"; then
+    echo -e "${RED}❌ コミット拒否: touchAction: 'none' の使用は禁止されています${NC}"
+    exit 1
+fi
+
+# touch-action: none のチェック
+if git diff --cached --name-only | xargs grep -l "touch-action.*none" 2>/dev/null | grep -q "app/"; then
+    echo -e "${RED}❌ コミット拒否: touch-action: none の使用は禁止されています${NC}"
+    exit 1
+fi
+
+# handleMobileMicPress のチェック
+if git diff --cached --name-only | xargs grep -l "handleMobileMicPress" 2>/dev/null | grep -q "app/"; then
+    echo -e "${RED}❌ コミット拒否: handleMobileMicPress の使用は禁止されています${NC}"
+    exit 1
+fi
+
+echo -e "${GREEN}✅ プリコミットチェック完了${NC}"
+exit 0

@@ -1,0 +1,928 @@
+'use client'
+
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { Download, FileCheck2, RotateCcw, Send, X } from 'lucide-react'
+import Header from '@/components/Header'
+import BottomNav from '@/components/BottomNav'
+import type { MaintenanceRequestRecord } from '@/lib/maintenance'
+
+type WorkAttachment = {
+  name: string
+  type: 'image' | 'video'
+  source: string
+  url: string
+}
+
+type DemoMedia = {
+  name?: string
+  mimeType?: string
+  dataUrl?: string
+  kind?: 'image' | 'video'
+}
+
+type DemoReportDraft = {
+  storeName?: string
+  machineName?: string
+  machineModel?: string
+  machineSerial?: string
+  faultLocation?: string
+  symptom?: string
+  remarks?: string
+  completedAt?: string
+  workStartedAt?: string | null
+  requestedEmail?: string
+  beforeMedia?: DemoMedia[]
+  afterMedia?: DemoMedia[]
+}
+
+const MECHANIC_DEMO_REPORT_KEY = 'mechanic-demo-report-v1'
+const MECHANIC_OPERATION_MODE_KEY = 'mechanic-operation-mode-v1'
+
+function asText(value: unknown) {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function parseAttachments(input: unknown): WorkAttachment[] {
+  if (!Array.isArray(input)) return []
+  return input
+    .map((entry, index) => {
+      if (!entry || typeof entry !== 'object') return null
+      const row = entry as { name?: unknown; type?: unknown; source?: unknown; url?: unknown }
+      const url = asText(row.url)
+      if (!url) return null
+      const typeRaw = asText(row.type)
+      return {
+        name: asText(row.name) || `attachment_${index + 1}`,
+        type: typeRaw === 'video' ? 'video' : 'image',
+        source: asText(row.source) || 'unknown',
+        url,
+      } satisfies WorkAttachment
+    })
+    .filter((v): v is WorkAttachment => v !== null)
+}
+
+function getLatestStartTime(remarks: string | null) {
+  const text = asText(remarks)
+  if (!text) return ''
+  const matches = [...text.matchAll(/WorkStartedAt:\s*([^\n\r]+)/g)]
+  if (matches.length === 0) return ''
+  const latest = matches[matches.length - 1]?.[1]
+  return latest ? latest.trim() : ''
+}
+
+function getLatestRecordedTime(remarks: string | null) {
+  const text = asText(remarks)
+  if (!text) return ''
+  const matches = [...text.matchAll(/RecordedAt:\s*([^\n\r]+)/g)]
+  if (matches.length === 0) return ''
+  const latest = matches[matches.length - 1]?.[1]
+  return latest ? latest.trim() : ''
+}
+
+function getLatestComment(remarks: string | null) {
+  const text = asText(remarks)
+  if (!text) return ''
+  const matches = [...text.matchAll(/Comment:\s*([^\n\r]+)/g)]
+  if (matches.length === 0) return ''
+  const latest = matches[matches.length - 1]?.[1]
+  return latest ? latest.trim() : ''
+}
+
+function buildDemoRecord(draft: DemoReportDraft): MaintenanceRequestRecord {
+  const nowIso = new Date().toISOString()
+  const today = nowIso.slice(0, 10)
+  const startedAt = asText(draft.workStartedAt)
+  const noteLines = [
+    '[Mechanic Work Start]',
+    startedAt ? `WorkStartedAt: ${startedAt}` : '',
+    '[Mechanic Work Complete]',
+    `RecordedAt: ${asText(draft.completedAt) || nowIso}`,
+    `Comment: ${asText(draft.remarks) || '-'}`,
+  ]
+    .filter(Boolean)
+    .join('\n')
+
+  const toAttachment = (media: DemoMedia[] | undefined, source: 'mechanic_before' | 'mechanic_after') =>
+    (media ?? []).reduce<
+      Array<{ name: string; type: 'image' | 'video'; source: 'mechanic_before' | 'mechanic_after'; url: string }>
+    >((acc, item, idx) => {
+      const url = asText(item.dataUrl)
+      if (!url) return acc
+      const type = item.kind === 'video' || asText(item.mimeType).startsWith('video/') ? 'video' : 'image'
+      acc.push({
+        name: asText(item.name) || `${source}_${idx + 1}`,
+        type,
+        source,
+        url,
+      })
+      return acc
+    }, [])
+
+  const attachments = [
+    ...toAttachment(draft.beforeMedia, 'mechanic_before'),
+    ...toAttachment(draft.afterMedia, 'mechanic_after'),
+  ]
+
+  return {
+    id: 'demo-report',
+    store_id: 'demo-store',
+    store_name: asText(draft.storeName) || 'Demo Store',
+    category_id: 'kitchen',
+    item_id: 'jet-oven',
+    machine_id: 'demo-machine-1',
+    machine_name: asText(draft.machineName) || 'DEMO Jet Oven',
+    machine_model: asText(draft.machineModel) || 'JO-DEMO-01',
+    machine_serial: asText(draft.machineSerial) || 'DEMO-0001',
+    fault_location: asText(draft.faultLocation) || 'Control Panel',
+    symptom: asText(draft.symptom) || 'Demo sample',
+    photo_urls: [],
+    request_flow: 'machine_first',
+    machine_source_pages: [],
+    urgency: 'normal',
+    remarks: noteLines,
+    attachments,
+    preferred_date: today,
+    preferred_start_time: '10:00',
+    preferred_end_time: '12:00',
+    status: 'completed',
+    source: 'staff_portal',
+    troubleshooting_summary: null,
+    requested_by: null,
+    requested_phone: null,
+    requested_email: asText(draft.requestedEmail) || null,
+    vendor_name: 'Demo Vendor',
+    scheduled_date: today,
+    scheduled_start_time: '10:30',
+    scheduled_end_time: '11:30',
+    vendor_proposed_date: today,
+    vendor_proposed_start_time: '10:30',
+    vendor_proposed_end_time: '11:30',
+    schedule_change_status: 'approved',
+    completed_at: asText(draft.completedAt) || nowIso,
+    created_at: nowIso,
+    updated_at: nowIso,
+  }
+}
+
+export default function MechanicReportConfirmPage() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const isDemoMode = searchParams.get('demo') === '1'
+  const requestId = searchParams.get('requestId') || ''
+  const initialEmail = searchParams.get('email') || ''
+
+  const [loading, setLoading] = useState(true)
+  const [record, setRecord] = useState<MaintenanceRequestRecord | null>(null)
+  const [customerEmail, setCustomerEmail] = useState(initialEmail)
+  const [isSavingPdf, setIsSavingPdf] = useState(false)
+  const [isSending, setIsSending] = useState(false)
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [operationMode, setOperationMode] = useState<'production' | 'demo'>('production')
+  const [isModeConfirmOpen, setIsModeConfirmOpen] = useState(false)
+  const [signatureDataUrl, setSignatureDataUrl] = useState('')
+  const [isSignModalOpen, setIsSignModalOpen] = useState(false)
+  const modeDialogAutoCloseTimerRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    const savedMode = localStorage.getItem(MECHANIC_OPERATION_MODE_KEY)
+    if (savedMode === 'demo' || savedMode === 'production') {
+      setOperationMode(savedMode)
+    }
+
+    if (isDemoMode) {
+      try {
+        const raw = localStorage.getItem(MECHANIC_DEMO_REPORT_KEY)
+        const parsed = raw ? (JSON.parse(raw) as DemoReportDraft) : {}
+        const demoRecord = buildDemoRecord(parsed)
+        setRecord(demoRecord)
+        setCustomerEmail((prev) => (prev || parsed.requestedEmail || '').trim())
+      } catch {
+        setRecord(buildDemoRecord({ requestedEmail: initialEmail }))
+      } finally {
+        setLoading(false)
+      }
+      return
+    }
+
+    if (!requestId) {
+      setLoading(false)
+      return
+    }
+    const load = async () => {
+      try {
+        const res = await fetch(`/api/maintenance/${encodeURIComponent(requestId)}`, { cache: 'no-store' })
+        const json = (await res.json()) as { request?: MaintenanceRequestRecord; error?: string }
+        if (!res.ok || !json.request) {
+          throw new Error(json.error || 'Failed to load maintenance record')
+        }
+        setRecord(json.request)
+        setCustomerEmail((prev) => (prev || json.request?.requested_email || '').trim())
+      } catch (error) {
+        setFeedback({
+          type: 'error',
+          message: error instanceof Error ? error.message : 'Failed to load maintenance record',
+        })
+      } finally {
+        setLoading(false)
+      }
+    }
+    void load()
+  }, [initialEmail, isDemoMode, requestId])
+
+  useEffect(() => {
+    return () => {
+      if (modeDialogAutoCloseTimerRef.current !== null) {
+        window.clearTimeout(modeDialogAutoCloseTimerRef.current)
+      }
+    }
+  }, [])
+
+  const attachments = useMemo(() => parseAttachments(record?.attachments), [record?.attachments])
+  const beforeImages = useMemo(
+    () => attachments.filter((item) => item.source === 'mechanic_before' && item.type === 'image'),
+    [attachments]
+  )
+  const afterImages = useMemo(
+    () => attachments.filter((item) => item.source === 'mechanic_after' && item.type === 'image'),
+    [attachments]
+  )
+  const beforeVideos = useMemo(
+    () => attachments.filter((item) => item.source === 'mechanic_before' && item.type === 'video'),
+    [attachments]
+  )
+  const afterVideos = useMemo(
+    () => attachments.filter((item) => item.source === 'mechanic_after' && item.type === 'video'),
+    [attachments]
+  )
+
+  const startTime = getLatestStartTime(record?.remarks ?? null)
+  const recordedTime = getLatestRecordedTime(record?.remarks ?? null) || asText(record?.completed_at)
+  const latestComment = getLatestComment(record?.remarks ?? null) || '-'
+
+  const hasSignature = signatureDataUrl.length > 0
+
+  const buildDemoData = () => ({
+    storeName: record?.store_name,
+    machineName: record?.machine_name,
+    machineModel: record?.machine_model,
+    machineSerial: record?.machine_serial,
+    faultLocation: record?.fault_location,
+    symptom: record?.symptom,
+    remarks: record?.remarks,
+    requestedEmail: customerEmail || record?.requested_email,
+    completedAt: record?.completed_at,
+    workStartedAt: getLatestStartTime(record?.remarks ?? null),
+    beforeMedia: beforeImages.map((item) => ({
+      name: item.name,
+      mimeType: 'image/png',
+      dataUrl: item.url,
+      kind: 'image' as const,
+    })),
+    afterMedia: [
+      ...afterImages.map((item) => ({
+        name: item.name,
+        mimeType: 'image/png',
+        dataUrl: item.url,
+        kind: 'image' as const,
+      })),
+      ...afterVideos.map((item) => ({
+        name: item.name,
+        mimeType: 'video/mp4',
+        dataUrl: item.url,
+        kind: 'video' as const,
+      })),
+    ],
+  })
+
+  const openSignModal = () => {
+    setIsSignModalOpen(true)
+    document.body.style.overflow = 'hidden'
+  }
+
+  const closeSignModal = (dataUrl?: string) => {
+    setIsSignModalOpen(false)
+    document.body.style.overflow = ''
+    if (dataUrl !== undefined) {
+      setSignatureDataUrl(dataUrl)
+    }
+  }
+
+  const targetMode = operationMode === 'production' ? 'demo' : 'production'
+
+  const closeModeConfirmDialog = () => {
+    if (modeDialogAutoCloseTimerRef.current !== null) {
+      window.clearTimeout(modeDialogAutoCloseTimerRef.current)
+      modeDialogAutoCloseTimerRef.current = null
+    }
+    setIsModeConfirmOpen(false)
+  }
+
+  const openModeConfirmDialog = () => {
+    setIsModeConfirmOpen(true)
+    if (modeDialogAutoCloseTimerRef.current !== null) {
+      window.clearTimeout(modeDialogAutoCloseTimerRef.current)
+    }
+    modeDialogAutoCloseTimerRef.current = window.setTimeout(() => {
+      closeModeConfirmDialog()
+    }, 15000)
+  }
+
+  const confirmModeSwitch = () => {
+    closeModeConfirmDialog()
+    const nextMode = operationMode === 'production' ? 'demo' : 'production'
+    setOperationMode(nextMode)
+    localStorage.setItem(MECHANIC_OPERATION_MODE_KEY, nextMode)
+    setFeedback({
+      type: 'success',
+      message:
+        nextMode === 'demo'
+          ? 'Switched to DEMO mode. Return to Mechanic to use sample job.'
+          : 'Switched to PRODUCTION mode. Return to Mechanic to use real jobs only.',
+    })
+  }
+
+  const downloadReportPdf = async () => {
+    if (!record || isSavingPdf) return
+    setFeedback(null)
+    setIsSavingPdf(true)
+    try {
+      const response = await fetch('/api/mechanic/work-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requestId: isDemoMode ? undefined : record.id,
+          demoData: isDemoMode ? buildDemoData() : undefined,
+          customerEmail,
+          mode: 'download',
+          signatureDataUrl,
+        }),
+      })
+      if (!response.ok) {
+        const json = (await response.json().catch(() => ({}))) as { error?: string }
+        throw new Error(json.error || 'Failed to generate report PDF')
+      }
+      const contentType = response.headers.get('Content-Type') || ''
+      if (!contentType.includes('application/pdf')) {
+        throw new Error('Invalid PDF response')
+      }
+      const blob = await response.blob()
+      const cd = response.headers.get('Content-Disposition')
+      let filename = 'acceptance-report.pdf'
+      const m = cd?.match(/filename="([^"]+)"/)
+      if (m?.[1]) filename = m[1]
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      a.rel = 'noopener'
+      a.click()
+      URL.revokeObjectURL(url)
+      setFeedback({ type: 'success', message: 'Acceptance report PDF downloaded.' })
+    } catch (error) {
+      setFeedback({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Failed to generate report PDF',
+      })
+    } finally {
+      setIsSavingPdf(false)
+    }
+  }
+
+  const sendReportToCustomer = async () => {
+    if (!record || isSending) return
+    if (!hasSignature) {
+      setFeedback({ type: 'error', message: 'Please collect customer signature before sending.' })
+      return
+    }
+    setFeedback(null)
+    setIsSending(true)
+    try {
+      const response = await fetch('/api/mechanic/work-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requestId: isDemoMode ? undefined : record.id,
+          demoData: isDemoMode ? buildDemoData() : undefined,
+          customerEmail,
+          mode: 'send',
+          signatureDataUrl,
+        }),
+      })
+      const json = (await response.json()) as {
+        success?: boolean
+        error?: string
+        recipient?: string
+        stateUpdateError?: string
+      }
+      if (!response.ok || !json.success) {
+        throw new Error(json.error || 'Failed to send report email')
+      }
+      setFeedback({
+        type: 'success',
+        message: json.stateUpdateError
+          ? `Report sent to ${json.recipient || customerEmail || 'customer'}, but workflow update failed: ${json.stateUpdateError}`
+          : `Report sent to ${json.recipient || customerEmail || 'customer'}. Waiting for invoice issuance.`,
+      })
+    } catch (error) {
+      setFeedback({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Failed to send report email',
+      })
+    } finally {
+      setIsSending(false)
+    }
+  }
+
+  if (!isDemoMode && !requestId) {
+    return (
+      <div className="min-h-screen bg-gray-50 pb-24">
+        <Header showBack title="Acceptance Report" />
+        <main className="px-4 py-6">
+          <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            Missing requestId. Please go back and complete a work record first.
+          </div>
+        </main>
+        <BottomNav />
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <Header showBack title="Acceptance Report" onRightButtonTripleClick={openModeConfirmDialog} />
+
+      <main className="px-3 py-5 sm:px-4 sm:py-6" style={{ paddingBottom: '350px' }}>
+        {loading ? (
+          <div className="mx-auto max-w-[220mm] rounded-xl bg-white p-6 text-sm text-zinc-600 shadow-sm">
+            Loading report...
+          </div>
+        ) : record ? (
+          <div className="mx-auto flex w-full max-w-[220mm] justify-center">
+            <section className="flex min-h-[min(85vh,297mm)] w-full max-w-[210mm] flex-col rounded-sm border border-zinc-300/90 bg-white p-6 shadow-[0_12px_40px_-12px_rgba(0,0,0,0.25),0_4px_16px_-4px_rgba(0,0,0,0.12)] sm:min-h-[297mm] sm:p-8 md:p-10">
+              <div className="mb-6 border-b border-zinc-200 pb-4">
+                <p className="text-center text-sm font-semibold tracking-wide text-zinc-700">
+                  FUJIMAK PHILIPPINES CORPORATION
+                </p>
+                <h1 className="text-center text-lg font-bold tracking-tight text-zinc-900 sm:text-xl">
+                  ACCEPTANCE REPORT
+                </h1>
+                <div className="mt-2 flex flex-col items-end gap-1">
+                  <p className="text-xs font-medium text-zinc-700">mechanician:sakon hiroki</p>
+                  <div className="inline-flex rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-600">
+                    {new Date().toLocaleString()}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mb-4 grid gap-2 text-sm text-zinc-700">
+                <p style={{ marginLeft: '6px' }}>
+                  <span className="font-semibold">Request ID:</span> {record.id}
+                </p>
+                <p style={{ marginLeft: '6px' }}>
+                  <span className="font-semibold">Store:</span> {record.store_name || record.store_id}
+                </p>
+                <p style={{ marginLeft: '6px' }}>
+                  <span className="font-semibold">Machine:</span> {record.machine_name || record.machine_model || '-'}
+                </p>
+                <p style={{ marginLeft: '6px' }}>
+                  <span className="font-semibold">Model / Serial:</span> {record.machine_model || '-'} /{' '}
+                  {record.machine_serial || '-'}
+                </p>
+                <p style={{ marginLeft: '6px' }}>
+                  <span className="font-semibold">Fault Location:</span> {record.fault_location || '-'}
+                </p>
+                <p style={{ marginLeft: '6px' }}>
+                  <span className="font-semibold">Symptom:</span> {record.symptom || '-'}
+                </p>
+              </div>
+
+              <div
+                className="rounded-lg border border-zinc-200 bg-white p-3 text-sm text-zinc-700"
+                style={{ marginLeft: '6px', width: 'calc(100% - 6px)' }}
+              >
+                <p className="font-semibold" style={{ marginLeft: '6px' }}>Before Photos</p>
+                <div className="mt-2 grid gap-3 md:grid-cols-[minmax(0,1fr)_220px]">
+                  <div>
+                    {beforeImages.length > 0 ? (
+                      <div className="grid grid-cols-3 gap-2">
+                        {beforeImages.slice(0, 6).map((img) => (
+                          <div key={`before-${img.url}`} className="h-24 overflow-hidden rounded border border-zinc-200">
+                            {/* eslint-disable-next-line @next/next/no-img-element -- remote/data-url evidence preview */}
+                            <img src={img.url} alt={img.name} className="h-full w-full object-cover" />
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-1 text-zinc-500" style={{ marginLeft: '6px' }}>-</p>
+                    )}
+                  </div>
+                  <div className="rounded-md border border-zinc-200 bg-zinc-50 p-2.5 text-xs text-zinc-700">
+                    <p className="font-semibold">Before Data</p>
+                    <p className="mt-2">
+                      <span className="font-semibold">WorkStarted:</span> {startTime || '-'}
+                    </p>
+                  </div>
+                </div>
+
+                <p className="mt-4 font-semibold" style={{ marginLeft: '6px' }}>After Photos</p>
+                <div className="mt-2 grid gap-3 md:grid-cols-[minmax(0,1fr)_220px]">
+                  <div>
+                    {afterImages.length > 0 ? (
+                      <div className="grid grid-cols-3 gap-2">
+                        {afterImages.slice(0, 6).map((img) => (
+                          <div key={`after-${img.url}`} className="h-24 overflow-hidden rounded border border-zinc-200">
+                            {/* eslint-disable-next-line @next/next/no-img-element -- remote/data-url evidence preview */}
+                            <img src={img.url} alt={img.name} className="h-full w-full object-cover" />
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-1 text-zinc-500" style={{ marginLeft: '6px' }}>-</p>
+                    )}
+                  </div>
+                  <div className="rounded-md border border-zinc-200 bg-zinc-50 p-2.5 text-xs text-zinc-700">
+                    <p className="font-semibold">After Data</p>
+                    <p className="mt-2">
+                      <span className="font-semibold">Recorded:</span> {recordedTime || '-'}
+                    </p>
+                    <p className="mt-1">
+                      <span className="font-semibold">Comment:</span> {latestComment}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                className="mt-4 rounded-lg border border-zinc-200 bg-zinc-50 p-3"
+                style={{ marginLeft: '6px', width: 'calc(100% - 6px)' }}
+              >
+                <p className="text-sm font-semibold text-zinc-800" style={{ marginLeft: '6px' }}>
+                  Customer Signature
+                </p>
+                {hasSignature ? (
+                  <div className="mt-2">
+                    {/* eslint-disable-next-line @next/next/no-img-element -- signature preview from canvas data URL */}
+                    <img
+                      src={signatureDataUrl}
+                      alt="Customer signature"
+                      className="h-24 w-full rounded-lg border border-zinc-300 bg-white object-contain"
+                    />
+                    <div className="mt-2 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={openSignModal}
+                        className="flex-1 rounded-lg border border-zinc-300 bg-white px-3 text-sm font-medium text-zinc-700"
+                        style={{ paddingTop: '14px', paddingBottom: '14px' }}
+                      >
+                        Re-sign
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSignatureDataUrl('')}
+                        className="inline-flex items-center gap-1 rounded-lg border border-zinc-300 bg-white px-3 text-sm font-medium text-zinc-700"
+                        style={{ paddingTop: '14px', paddingBottom: '14px' }}
+                      >
+                        <RotateCcw className="h-3 w-3" />
+                        Clear
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={openSignModal}
+                    className="mt-2 flex w-full flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-zinc-300 bg-white text-sm text-zinc-500"
+                    style={{ paddingTop: '28px', paddingBottom: '28px' }}
+                  >
+                    <span className="text-2xl">&#9998;</span>
+                    Tap to sign
+                  </button>
+                )}
+              </div>
+
+              <div className="mt-4 space-y-2 scroll-mb-80" style={{ marginLeft: '6px', width: 'calc(100% - 6px)' }}>
+                <label className="text-sm font-semibold text-zinc-800">Customer Email (for report delivery)</label>
+                <input
+                  type="email"
+                  value={customerEmail}
+                  onChange={(event) => setCustomerEmail(event.target.value)}
+                  onFocus={(event) => {
+                    event.currentTarget.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                  }}
+                  placeholder="customer@example.com"
+                  className="w-full rounded-xl border border-zinc-300 px-3 text-sm text-zinc-800 focus:border-zinc-900 focus:outline-none"
+                  style={{ paddingTop: '20px', paddingBottom: '20px' }}
+                />
+              </div>
+            </section>
+          </div>
+        ) : null}
+
+        {feedback ? (
+          <p
+            className={`mx-auto mt-4 w-full max-w-[220mm] rounded-lg px-3 py-2 text-sm ${
+              feedback.type === 'success'
+                ? 'border border-emerald-200 bg-emerald-50 text-emerald-700'
+                : 'border border-red-200 bg-red-50 text-red-700'
+            }`}
+          >
+            {feedback.message}
+          </p>
+        ) : null}
+
+        <div className="mx-auto mt-4 w-full max-w-[220mm] border-t border-stone-300/80 px-4 py-3">
+          <div className="flex w-full flex-col gap-2">
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => void downloadReportPdf()}
+                disabled={isSavingPdf || loading || !record}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-zinc-400 bg-white px-3 text-sm font-semibold text-zinc-900 shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
+                style={{ paddingTop: '20px', paddingBottom: '20px' }}
+              >
+                <Download className="h-4 w-4 shrink-0" strokeWidth={2} />
+                {isSavingPdf ? 'Generating...' : 'Save PDF'}
+              </button>
+              <button
+                type="button"
+                onClick={() => void sendReportToCustomer()}
+                disabled={isSending || loading || !record}
+                className="inline-flex items-center justify-center gap-2 rounded-xl px-3 text-sm font-semibold shadow-sm disabled:cursor-not-allowed"
+                style={{
+                  backgroundColor: isSending ? '#a1a1aa' : '#18181b',
+                  color: '#ffffff',
+                  paddingTop: '20px',
+                  paddingBottom: '20px',
+                }}
+              >
+                <Send className="h-4 w-4 shrink-0 text-white" strokeWidth={2} />
+                {isSending ? 'Sending...' : 'Send to Customer'}
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => router.push('/mechanic')}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-zinc-300 bg-white px-4 text-sm font-semibold text-zinc-800 shadow-sm"
+              style={{ paddingTop: '16px', paddingBottom: '16px' }}
+            >
+              <FileCheck2 className="h-4 w-4 shrink-0" />
+              Back to Mechanic
+            </button>
+          </div>
+        </div>
+      </main>
+
+      {isModeConfirmOpen ? (
+        <div
+          className="fixed inset-0 z-[90] bg-black/45 p-4"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) closeModeConfirmDialog()
+          }}
+        >
+          <div className="mx-auto mt-[12vh] w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
+            <h2 className="text-base font-bold text-zinc-900">Switch app mode?</h2>
+            <p className="mt-2 text-sm text-zinc-600">
+              {targetMode === 'production'
+                ? 'Demo sample will be hidden and only real scheduled jobs will be used.'
+                : 'Demo sample will be enabled for workflow practice.'}
+            </p>
+            <div className="mt-3 rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700">
+              <p>
+                Current: <span className="font-semibold">{operationMode.toUpperCase()}</span>
+              </p>
+              <p className="mt-1">
+                Target: <span className="font-semibold">{targetMode.toUpperCase()}</span>
+              </p>
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={closeModeConfirmDialog}
+                className="rounded-xl border border-zinc-300 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-800"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmModeSwitch}
+                className="rounded-xl bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-white"
+              >
+                {targetMode === 'production' ? 'Switch to Production' : 'Switch to Demo'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {isSignModalOpen ? <SignatureModal onClose={closeSignModal} initialDataUrl={signatureDataUrl} /> : null}
+
+      <BottomNav />
+    </div>
+  )
+}
+
+function SignatureModal(props: { onClose: (dataUrl?: string) => void; initialDataUrl: string }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const overlayRef = useRef<HTMLDivElement>(null)
+  const isDrawingRef = useRef(false)
+  const [hasStrokes, setHasStrokes] = useState(false)
+
+  useEffect(() => {
+    const html = document.documentElement
+    const body = document.body
+    const prevHtmlOverflow = html.style.overflow
+    const prevBodyOverflow = body.style.overflow
+    const prevBodyPosition = body.style.position
+    const prevBodyTop = body.style.top
+    const prevBodyWidth = body.style.width
+    const scrollY = window.scrollY
+
+    html.style.overflow = 'hidden'
+    body.style.overflow = 'hidden'
+    body.style.position = 'fixed'
+    body.style.top = `-${scrollY}px`
+    body.style.width = '100%'
+
+    const blockTouchMove = (e: TouchEvent) => {
+      e.preventDefault()
+    }
+    const overlay = overlayRef.current
+    overlay?.addEventListener('touchmove', blockTouchMove, { passive: false })
+
+    return () => {
+      html.style.overflow = prevHtmlOverflow
+      body.style.overflow = prevBodyOverflow
+      body.style.position = prevBodyPosition
+      body.style.top = prevBodyTop
+      body.style.width = prevBodyWidth
+      window.scrollTo(0, scrollY)
+      overlay?.removeEventListener('touchmove', blockTouchMove)
+    }
+  }, [])
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const parent = canvas.parentElement
+    if (!parent) return
+    const dpr = window.devicePixelRatio || 1
+    const w = parent.clientWidth
+    const h = parent.clientHeight
+    canvas.width = Math.max(1, Math.floor(w * dpr))
+    canvas.height = Math.max(1, Math.floor(h * dpr))
+    canvas.style.width = `${w}px`
+    canvas.style.height = `${h}px`
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    ctx.setTransform(1, 0, 0, 1, 0, 0)
+    ctx.scale(dpr, dpr)
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, w, h)
+    ctx.lineWidth = 2.5
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+    ctx.strokeStyle = '#111827'
+
+    if (props.initialDataUrl) {
+      const img = new Image()
+      img.onload = () => {
+        ctx.drawImage(img, 0, 0, w, h)
+        setHasStrokes(true)
+      }
+      img.src = props.initialDataUrl
+    }
+  }, [props.initialDataUrl])
+
+  const getPoint = (clientX: number, clientY: number) => {
+    const canvas = canvasRef.current
+    if (!canvas) return null
+    const rect = canvas.getBoundingClientRect()
+    return { x: clientX - rect.left, y: clientY - rect.top }
+  }
+
+  const startStroke = (clientX: number, clientY: number) => {
+    const ctx = canvasRef.current?.getContext('2d')
+    const pt = getPoint(clientX, clientY)
+    if (!ctx || !pt) return
+    isDrawingRef.current = true
+    setHasStrokes(true)
+    ctx.beginPath()
+    ctx.moveTo(pt.x, pt.y)
+  }
+
+  const continueStroke = (clientX: number, clientY: number) => {
+    if (!isDrawingRef.current) return
+    const ctx = canvasRef.current?.getContext('2d')
+    const pt = getPoint(clientX, clientY)
+    if (!ctx || !pt) return
+    ctx.lineTo(pt.x, pt.y)
+    ctx.stroke()
+  }
+
+  const endStroke = () => {
+    isDrawingRef.current = false
+  }
+
+  const clearCanvas = () => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    const dpr = window.devicePixelRatio || 1
+    const w = canvas.width / dpr
+    const h = canvas.height / dpr
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, w, h)
+    setHasStrokes(false)
+  }
+
+  const handleDone = () => {
+    const canvas = canvasRef.current
+    if (!canvas || !hasStrokes) {
+      props.onClose('')
+      return
+    }
+    props.onClose(canvas.toDataURL('image/png'))
+  }
+
+  return (
+    <div ref={overlayRef} className="fixed inset-0 flex flex-col items-center justify-center bg-black/50" style={{ zIndex: 9999, overscrollBehavior: 'none' }}>
+      <div className="mx-4 w-full max-w-lg rounded-2xl bg-white shadow-xl">
+        <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-3">
+          <h2 className="text-base font-bold text-zinc-900">Customer Signature</h2>
+          <button
+            type="button"
+            onClick={() => props.onClose()}
+            className="rounded-full p-2 text-zinc-600 hover:bg-zinc-100"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <p className="px-4 pt-2 text-xs text-zinc-500">
+          Sign below with finger or stylus.
+        </p>
+
+        <div className="px-4 py-2">
+          <canvas
+            ref={canvasRef}
+            className="w-full rounded-xl border-2 border-zinc-300 bg-white"
+            style={{ height: '200px' }}
+            onPointerDown={(e) => {
+              e.preventDefault()
+              startStroke(e.clientX, e.clientY)
+            }}
+            onPointerMove={(e) => {
+              e.preventDefault()
+              continueStroke(e.clientX, e.clientY)
+            }}
+            onPointerUp={(e) => {
+              e.preventDefault()
+              endStroke()
+            }}
+            onPointerCancel={(e) => {
+              e.preventDefault()
+              endStroke()
+            }}
+            onTouchStart={(e) => {
+              const t = e.touches[0]
+              if (!t) return
+              e.preventDefault()
+              startStroke(t.clientX, t.clientY)
+            }}
+            onTouchMove={(e) => {
+              const t = e.touches[0]
+              if (!t) return
+              e.preventDefault()
+              continueStroke(t.clientX, t.clientY)
+            }}
+            onTouchEnd={(e) => {
+              e.preventDefault()
+              endStroke()
+            }}
+          />
+        </div>
+
+        <div className="flex gap-3 border-t border-zinc-200 px-4 py-3">
+          <button
+            type="button"
+            onClick={clearCanvas}
+            className="flex-1 rounded-xl border border-zinc-300 bg-white px-4 text-sm font-semibold text-zinc-800"
+            style={{ paddingTop: '20px', paddingBottom: '20px' }}
+          >
+            Clear
+          </button>
+          <button
+            type="button"
+            onClick={handleDone}
+            className="flex-1 rounded-xl px-4 text-sm font-semibold text-white"
+            style={{ paddingTop: '20px', paddingBottom: '20px', backgroundColor: '#16a34a' }}
+          >
+            Done
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}

@@ -1,0 +1,97 @@
+---
+description: モバイルフッター重なり問題の原因と解決策。固定フッター（BottomNav）がある画面で下部コンテンツが隠れる問題を防ぐルール。
+alwaysApply: true
+---
+
+# モバイルフッター重なり問題（BottomNav overlap）
+
+## 問題
+
+固定フッター（`BottomNav`）がある画面で、ページ最下部のボタンや入力欄がフッターに隠れてタップできない。  
+特にモバイル端末（iPhone Chrome等）で発生し、画面縦が短い場合に深刻化する。
+
+## 原因
+
+### 1. Tailwindの `calc(var(...))` が実機で適用されない
+
+```
+pb-[calc(var(--bottom-nav-height,88px)+10rem)]
+```
+
+この記法は**ローカルPCブラウザでは効くがモバイル実機では効かない場合がある**。  
+Tailwind v4のarbitrary values内で `calc()` + `var()` + fallback を組み合わせると、  
+ビルド時にクラスが生成されない、または実行時にCSS変数が未定義で余白ゼロになる。
+
+### 2. 固定要素の重ね置き
+
+`BottomNav`（`fixed bottom-0 z-50`）の上にさらに  
+アクションバー（`fixed bottom-20 z-60`）を重ねると、  
+端末によってはスクロール不能領域が画面の半分以上を占め、  
+コンテンツが一切タップできなくなる。
+
+### 3. CSS変数 `--bottom-nav-height` の不安定さ
+
+`useEffect` + `ResizeObserver` でフッター高さを `--bottom-nav-height` に書き込んでも、  
+SSR時・初回描画時・ページ遷移時に値がセットされないタイミングがあり、  
+fallback値（88px）と実際のフッター高さ（iPhone: 約140px）が乖離する。
+
+## 解決策
+
+### 原則: **インラインstyleの固定ピクセル値を使う**
+
+```tsx
+// OK: 確実に効く
+<main style={{ paddingBottom: '300px' }}>
+
+// NG: モバイルで効かない場合がある
+<main className="pb-[calc(var(--bottom-nav-height,88px)+10rem)]">
+```
+
+### 具体ルール
+
+1. **`main` の `paddingBottom` はインラインstyleで固定値を指定する**
+   - `/mechanic`: `style={{ paddingBottom: '300px' }}`
+   - `/mechanic/report-confirm`: `style={{ paddingBottom: '350px' }}`
+   - 値はフッター高さ（約140px）＋ボタン高さ（約60px）＋余裕（100px）で算出
+
+2. **固定アクションバーの `bottom` もインラインstyleで指定する**
+   ```tsx
+   <div style={{ bottom: '88px' }}>
+   ```
+
+3. **固定要素は最小限にする**
+   - `BottomNav`（1個だけ `fixed bottom-0`）
+   - それ以外のボタンは**通常フロー**に置く（`fixed` にしない）
+   - どうしても固定が必要な場合は1層だけ、`bottom` は固定値
+
+4. **外側コンテナに `pb-24` 等のTailwindクラスを重複指定しない**
+   - `main` のインラインstyleだけで余白を管理する
+   - 外側divの `pb-XX` は削除する
+
+5. **`calc(var(--bottom-nav-height,...))` は使わない**
+   - CSS変数ベースの動的計算はモバイル実機で不安定
+   - 固定値で十分対応可能
+
+## BottomNavの構成
+
+```tsx
+// BottomNav.tsx
+return (
+  <>
+    {/* 通常フローのスペーサー（フッター分の高さを確保） */}
+    <div aria-hidden className="h-[var(--bottom-nav-height,88px)]" />
+    {/* 固定フッター本体 */}
+    <nav ref={navRef} className="fixed bottom-0 left-0 right-0 z-50 ...">
+      ...
+    </nav>
+  </>
+)
+```
+
+## チェックリスト（新規ページ作成時）
+
+- [ ] `main` の `paddingBottom` はインラインstyleで300px以上を指定しているか
+- [ ] 外側コンテナに `pb-XX` が重複していないか
+- [ ] `calc(var(--bottom-nav-height,...))` を使っていないか
+- [ ] 固定要素は `BottomNav` 以外に追加していないか（追加する場合は `bottom` を固定値で指定）
+- [ ] モバイル実機（iPhone Chrome）でスクロール最下部のボタンが見えてタップできるか確認したか

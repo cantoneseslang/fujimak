@@ -433,6 +433,7 @@ export default function SettingsPage() {
         }
       }
 
+      let mechanicsTableUnavailable = false
       for (const row of normalizedMechanics) {
         if (row.isNew) {
           const createRes = await fetch('/api/mechanics', {
@@ -446,7 +447,14 @@ export default function SettingsPage() {
             }),
           })
           if (!createRes.ok) {
-            const json = (await createRes.json().catch(() => ({}))) as { error?: string }
+            const json = (await createRes.json().catch(() => ({}))) as {
+              error?: string
+              code?: string
+            }
+            if (createRes.status === 503 && json.code === 'MECHANICS_TABLE_UNAVAILABLE') {
+              mechanicsTableUnavailable = true
+              break
+            }
             throw new Error(json.error || `Failed to create mechanic (${createRes.status})`)
           }
           continue
@@ -464,43 +472,58 @@ export default function SettingsPage() {
           }),
         })
         if (!updateRes.ok) {
-          const json = (await updateRes.json().catch(() => ({}))) as { error?: string }
+          const json = (await updateRes.json().catch(() => ({}))) as {
+            error?: string
+            code?: string
+          }
+          if (updateRes.status === 503 && json.code === 'MECHANICS_TABLE_UNAVAILABLE') {
+            mechanicsTableUnavailable = true
+            break
+          }
           throw new Error(json.error || `Failed to update mechanic (${updateRes.status})`)
         }
       }
 
-      const mechanicsReloadRes = await fetch('/api/mechanics?includeInactive=1&seedDefault=1', { cache: 'no-store' })
-      if (mechanicsReloadRes.ok) {
-        const mechanicsJson = (await mechanicsReloadRes.json()) as {
-          mechanics?: Array<{
-            id: string
-            name?: string
-            english_name?: string
-            email?: string
-            login_code?: string | null
-            is_active?: boolean
-          }>
+      if (mechanicsTableUnavailable) {
+        setSaveFeedback({
+          type: 'success',
+          message:
+            'Saved vendors, parts recipients, and SMTP. Mechanic profiles were not synced because the database table mechanics does not exist yet. Run Supabase migration 20260330000200_mechanic_assignment_board.sql (supabase/migrations), then save again to sync mechanics.',
+        })
+      } else {
+        const mechanicsReloadRes = await fetch('/api/mechanics?includeInactive=1&seedDefault=1', { cache: 'no-store' })
+        if (mechanicsReloadRes.ok) {
+          const mechanicsJson = (await mechanicsReloadRes.json()) as {
+            mechanics?: Array<{
+              id: string
+              name?: string
+              english_name?: string
+              email?: string
+              login_code?: string | null
+              is_active?: boolean
+            }>
+          }
+          const rows = Array.isArray(mechanicsJson.mechanics) ? mechanicsJson.mechanics : []
+          setMechanics(
+            rows.map((row) => ({
+              id: row.id,
+              name: (typeof row.english_name === 'string' && row.english_name.trim().length > 0
+                ? row.english_name
+                : row.name || ''
+              ).trim(),
+              email: (row.email || '').trim().toLowerCase(),
+              loginCode: typeof row.login_code === 'string' ? row.login_code : '',
+              is_active: row.is_active !== false,
+              isNew: false,
+            }))
+          )
         }
-        const rows = Array.isArray(mechanicsJson.mechanics) ? mechanicsJson.mechanics : []
-        setMechanics(
-          rows.map((row) => ({
-            id: row.id,
-            name: (typeof row.english_name === 'string' && row.english_name.trim().length > 0
-              ? row.english_name
-              : row.name || ''
-            ).trim(),
-            email: (row.email || '').trim().toLowerCase(),
-            loginCode: typeof row.login_code === 'string' ? row.login_code : '',
-            is_active: row.is_active !== false,
-            isNew: false,
-          }))
-        )
-      }
 
-      setSaveFeedback({
-        type: 'success',
-        message: `Saved (vendors: ${activeEmails.length}, mechanics: ${activeMechanics.length}/${normalizedMechanics.length}, parts recipients: ${partsRecipientsPayload.length}, smtp: ${normalizedSmtpSettings.user ? 'configured' : 'empty'})`,
-      })
+        setSaveFeedback({
+          type: 'success',
+          message: `Saved (vendors: ${activeEmails.length}, mechanics: ${activeMechanics.length}/${normalizedMechanics.length}, parts recipients: ${partsRecipientsPayload.length}, smtp: ${normalizedSmtpSettings.user ? 'configured' : 'empty'})`,
+        })
+      }
     } catch (error) {
       setSaveFeedback({
         type: 'error',

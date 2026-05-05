@@ -40,6 +40,27 @@ function isMissingColumnError(message: string) {
   return /column|schema cache|could not find/i.test(message)
 }
 
+/** Whole table missing (migration not applied) — not a missing-column fallback case */
+function isMechanicsTableUnavailableError(message: string) {
+  const m = message.toLowerCase()
+  return (
+    (m.includes('could not find the table') && m.includes('mechanics')) ||
+    (m.includes('relation') && m.includes('mechanics') && m.includes('does not exist')) ||
+    (m.includes('schema cache') && m.includes('public.mechanics'))
+  )
+}
+
+function mechanicsTableUnavailableResponse(message: string) {
+  return NextResponse.json(
+    {
+      error: message,
+      code: 'MECHANICS_TABLE_UNAVAILABLE',
+      hint: 'Apply Supabase migrations (e.g. 20260330000200_mechanic_assignment_board.sql) to create public.mechanics.',
+    },
+    { status: 503 }
+  )
+}
+
 async function ensureDefaultMechanics() {
   const supabase = getSupabaseAdmin()
   for (const seed of DEFAULT_MECHANICS) {
@@ -57,6 +78,7 @@ async function ensureDefaultMechanics() {
     const { error } = await supabase.from('mechanics').upsert(row, { onConflict: 'email' })
     if (error) {
       const message = asErrorMessage(error)
+      if (isMechanicsTableUnavailableError(message)) throw error
       if (!isMissingColumnError(message)) throw error
       const { error: fallbackError } = await supabase
         .from('mechanics')
@@ -70,7 +92,11 @@ async function ensureDefaultMechanics() {
           },
           { onConflict: 'email' }
         )
-      if (fallbackError) throw fallbackError
+      if (fallbackError) {
+        const fbMsg = asErrorMessage(fallbackError)
+        if (isMechanicsTableUnavailableError(fbMsg)) throw fallbackError
+        throw fallbackError
+      }
     }
   }
 }
@@ -146,6 +172,9 @@ export async function POST(request: NextRequest) {
       .single()
     if (error) {
       const message = asErrorMessage(error)
+      if (isMechanicsTableUnavailableError(message)) {
+        return mechanicsTableUnavailableResponse(message)
+      }
       if (!isMissingColumnError(message)) throw error
       const { data: fallbackData, error: fallbackError } = await supabase
         .from('mechanics')
@@ -156,12 +185,22 @@ export async function POST(request: NextRequest) {
         })
         .select('*')
         .single()
-      if (fallbackError) throw fallbackError
+      if (fallbackError) {
+        const fbMsg = asErrorMessage(fallbackError)
+        if (isMechanicsTableUnavailableError(fbMsg)) {
+          return mechanicsTableUnavailableResponse(fbMsg)
+        }
+        throw fallbackError
+      }
       return NextResponse.json({ mechanic: fallbackData }, { status: 201 })
     }
     return NextResponse.json({ mechanic: data }, { status: 201 })
   } catch (error) {
-    return NextResponse.json({ error: asErrorMessage(error) }, { status: 500 })
+    const message = asErrorMessage(error)
+    if (isMechanicsTableUnavailableError(message)) {
+      return mechanicsTableUnavailableResponse(message)
+    }
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
 
@@ -200,6 +239,9 @@ export async function PATCH(request: NextRequest) {
       .single()
     if (error) {
       const message = asErrorMessage(error)
+      if (isMechanicsTableUnavailableError(message)) {
+        return mechanicsTableUnavailableResponse(message)
+      }
       if (!isMissingColumnError(message)) throw error
       const fallbackPatch: Record<string, unknown> = {
         updated_at: new Date().toISOString(),
@@ -219,11 +261,21 @@ export async function PATCH(request: NextRequest) {
         .eq('id', id)
         .select('*')
         .single()
-      if (fallbackError) throw fallbackError
+      if (fallbackError) {
+        const fbMsg = asErrorMessage(fallbackError)
+        if (isMechanicsTableUnavailableError(fbMsg)) {
+          return mechanicsTableUnavailableResponse(fbMsg)
+        }
+        throw fallbackError
+      }
       return NextResponse.json({ mechanic: fallbackData })
     }
     return NextResponse.json({ mechanic: data })
   } catch (error) {
-    return NextResponse.json({ error: asErrorMessage(error) }, { status: 500 })
+    const message = asErrorMessage(error)
+    if (isMechanicsTableUnavailableError(message)) {
+      return mechanicsTableUnavailableResponse(message)
+    }
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

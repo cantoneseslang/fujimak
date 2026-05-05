@@ -65,6 +65,65 @@ async function imageBufferFromUrl(url: string): Promise<Buffer | null> {
   }
 }
 
+/** PNG / JPEG only — used to size PDF photo cells without extra deps. */
+function imageDimensionsFromBuffer(buf: Buffer): { width: number; height: number } | null {
+  if (buf.length < 24) return null
+
+  if (
+    buf[0] === 0x89 &&
+    buf[1] === 0x50 &&
+    buf[2] === 0x4e &&
+    buf[3] === 0x47 &&
+    buf[4] === 0x0d &&
+    buf[5] === 0x0a &&
+    buf[6] === 0x1a &&
+    buf[7] === 0x0a
+  ) {
+    const width = buf.readUInt32BE(16)
+    const height = buf.readUInt32BE(20)
+    if (width > 0 && height > 0 && width < 65536 && height < 65536) return { width, height }
+    return null
+  }
+
+  if (buf[0] === 0xff && buf[1] === 0xd8) {
+    let i = 2
+    while (i + 9 < buf.length) {
+      if (buf[i] !== 0xff) {
+        i++
+        continue
+      }
+      let marker = buf[i + 1]
+      if (marker === 0xd9) break
+      if (marker === 0xd8 || (marker >= 0xd0 && marker <= 0xd7) || marker === 0x01) {
+        i += 2
+        continue
+      }
+      const segLen = buf.readUInt16BE(i + 2)
+      if (segLen < 2 || i + 2 + segLen > buf.length) break
+      if (marker >= 0xc0 && marker <= 0xc3) {
+        const height = buf.readUInt16BE(i + 5)
+        const width = buf.readUInt16BE(i + 7)
+        if (width > 0 && height > 0) return { width, height }
+        return null
+      }
+      i += 2 + segLen
+    }
+    return null
+  }
+
+  return null
+}
+
+function pdfPhotoCellHeight(innerW: number, buf: Buffer | null, maxH: number, minH: number): number {
+  if (!buf || innerW <= 0) return minH
+  const d = imageDimensionsFromBuffer(buf)
+  if (!d || d.width <= 0 || d.height <= 0) {
+    return Math.min(maxH, Math.max(minH, 120))
+  }
+  const hFit = d.height * (innerW / d.width)
+  return Math.round(Math.min(maxH, Math.max(minH, hFit)))
+}
+
 function logoPathCandidates() {
   return [
     path.join(process.cwd(), 'public', 'images', 'fujimak-rogo.png'),
@@ -393,6 +452,59 @@ export async function buildMechanicWorkReportPdf(params: {
     doc.x = marginLeft
   }
 
+  /** Always Before | After two columns; empty side shows frame only. Height follows image aspect (fit, capped). */
+  const drawBeforeAfterPhotoGrid = async () => {
+    const colGap = 10
+    const halfW = (contentW - colGap) / 2
+    const innerW = Math.max(32, halfW - 2)
+    const maxPhotoH = 260
+    const placeholderMin = 76
+
+    const beforeBuf = beforeImages[0] ? await imageBufferFromUrl(beforeImages[0].url) : null
+    const afterBuf = afterImages[0] ? await imageBufferFromUrl(afterImages[0].url) : null
+
+    const hBefore = pdfPhotoCellHeight(innerW, beforeBuf, maxPhotoH, placeholderMin)
+    const hAfter = pdfPhotoCellHeight(innerW, afterBuf, maxPhotoH, placeholderMin)
+    const rowH = Math.max(hBefore, hAfter)
+
+    doc.font('Helvetica-Bold').fontSize(9).fillColor('#111111')
+    const labelH = Math.max(
+      doc.heightOfString('Before', { width: halfW }),
+      doc.heightOfString('After', { width: halfW })
+    )
+    ensureSpace(rowH + labelH + 28)
+
+    const titleTop = doc.y
+    doc.text('Before', marginLeft, titleTop, { width: halfW, align: 'left' })
+    doc.text('After', marginLeft + halfW + colGap, titleTop, { width: halfW, align: 'left' })
+
+    const rowY = titleTop + labelH + 4
+
+    const drawPhotoCell = (x: number, buf: Buffer | null) => {
+      doc.rect(x, rowY, halfW, rowH).strokeColor('#d4d4d8').lineWidth(0.8).stroke()
+      if (!buf) return
+      try {
+        doc.save()
+        doc.rect(x + 1, rowY + 1, halfW - 2, rowH - 2).clip()
+        doc.image(buf, x + 1, rowY + 1, {
+          fit: [halfW - 2, rowH - 2],
+          align: 'center',
+          valign: 'center',
+        })
+        doc.restore()
+      } catch {
+        doc.font('Helvetica').fontSize(7).fillColor('#111111').text('Load failed', x + 4, rowY + rowH / 2 - 4)
+      }
+    }
+
+    drawPhotoCell(marginLeft, beforeBuf)
+    drawPhotoCell(marginLeft + halfW + colGap, afterBuf)
+
+    doc.fillColor('#111111')
+    doc.y = rowY + rowH + 10
+    doc.x = marginLeft
+  }
+
   const drawInvoiceBlock = () => {
     if (!isInvoice) return
     ensureSpace(62)
@@ -457,10 +569,10 @@ export async function buildMechanicWorkReportPdf(params: {
   drawChecklist()
   drawRankConditions()
 
+  await drawBeforeAfterPhotoGrid()
+
   const thumbW = (contentW - 16) / 2
   const thumbH = 64
-  await drawPhotoStrip('Before', beforeImages.slice(0, 2), thumbW, thumbH)
-  await drawPhotoStrip('After', afterImages.slice(0, 2), thumbW, thumbH)
   await drawPhotoStrip('Overview', overviewImages, thumbW, thumbH)
 
   drawInvoiceBlock()

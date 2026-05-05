@@ -818,61 +818,14 @@ export default function MechanicReportConfirmPage() {
                 </div>
               </div>
 
-              <div className="mb-4 grid gap-3 text-sm text-zinc-700">
-                <p style={{ marginLeft: '6px' }}>
-                  <span className="font-semibold">Request ID:</span> {record.id}
-                </p>
-                <p style={{ marginLeft: '6px' }}>
-                  <span className="font-semibold">Store:</span> {record.store_name || record.store_id}
-                </p>
-                <label className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3" style={{ marginLeft: '6px' }}>
-                  <span className="min-w-[8rem] shrink-0 font-semibold">Machine:</span>
-                  <input
-                    value={reportForm.equipmentLabel}
-                    onChange={(e) => setReportForm((p) => ({ ...p, equipmentLabel: e.target.value }))}
-                    className="w-full min-w-0 flex-1 rounded-md border border-zinc-300 px-2 py-2 text-zinc-800"
-                  />
-                </label>
-                <div
-                  className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3"
-                  style={{ marginLeft: '6px' }}
-                >
-                  <span className="min-w-[8rem] shrink-0 font-semibold">Model / Serial:</span>
-                  <div className="flex w-full min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:gap-2">
-                    <input
-                      value={reportForm.brand}
-                      onChange={(e) => setReportForm((p) => ({ ...p, brand: e.target.value }))}
-                      placeholder="Model"
-                      className="w-full min-w-0 flex-1 rounded-md border border-zinc-300 px-2 py-2 text-zinc-800"
-                    />
-                    <input
-                      value={reportForm.serialNumber}
-                      onChange={(e) => setReportForm((p) => ({ ...p, serialNumber: e.target.value }))}
-                      placeholder="Serial"
-                      className="w-full min-w-0 flex-1 rounded-md border border-zinc-300 px-2 py-2 text-zinc-800"
-                    />
-                  </div>
-                </div>
-                <label className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3" style={{ marginLeft: '6px' }}>
-                  <span className="min-w-[8rem] shrink-0 font-semibold">Fault Location:</span>
-                  <input
-                    value={reportForm.locationText}
-                    onChange={(e) => setReportForm((p) => ({ ...p, locationText: e.target.value }))}
-                    className="w-full min-w-0 flex-1 rounded-md border border-zinc-300 px-2 py-2 text-zinc-800"
-                  />
-                </label>
-                <p style={{ marginLeft: '6px' }}>
-                  <span className="font-semibold">Symptom:</span> {record.symptom || '-'}
-                </p>
-              </div>
-
-              {/* Printed report body — PDF order; no collapsible summary/details in this preview */}
+              {/* Body order matches PDF: header block → FOR → checklist → ranking → photos (no duplicate inputs here) */}
               <div className="mb-4 space-y-3 text-sm text-zinc-700" style={{ marginLeft: '6px', width: 'calc(100% - 6px)' }}>
                 <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
                   <p className="mb-2 font-semibold text-zinc-900">More header fields (client / dates / equipment)</p>
                   <dl className="grid gap-2 text-xs sm:grid-cols-2">
                     {(
                       [
+                        ['Request ID', record.id],
                         ['Client', reportForm.clientLabel],
                         ['PIC', reportForm.picName],
                         ['Location', reportForm.locationText],
@@ -883,7 +836,8 @@ export default function MechanicReportConfirmPage() {
                         ['Finish Time', reportForm.finishTimeDisplay],
                         ['Form code', reportForm.formCode],
                         ['Operation date (printed)', reportForm.operationDateText],
-                      ] as const
+                        ['Symptom', asText(record.symptom) || '—'],
+                      ] satisfies ReadonlyArray<readonly [string, string]>
                     ).map(([label, value]) => (
                       <div key={label} className="border-b border-zinc-200/80 pb-1.5">
                         <dt className="font-medium text-zinc-600">{label}</dt>

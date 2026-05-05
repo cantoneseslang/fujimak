@@ -673,12 +673,17 @@ export default function MechanicPage() {
                     key={request.id}
                     type="button"
                     onClick={() => {
+                      // Re-tapping the already-selected card must NOT wipe local evidence —
+                      // users often tap again while scrolling; clearing here made saves upload
+                      // zero media so report-confirm showed unrelated older attachments from DB.
+                      if (request.id !== selectedRequestId) {
+                        setBeforeMedia([])
+                        setAfterMedia([])
+                        setComment('')
+                        setCustomerEmail(request.requested_email ?? '')
+                        setWorkStartSavedAt(null)
+                      }
                       setSelectedRequestId(request.id)
-                      setBeforeMedia([])
-                      setAfterMedia([])
-                      setComment('')
-                      setCustomerEmail(request.requested_email ?? '')
-                      setWorkStartSavedAt(null)
                       setMessage(null)
                       setError(null)
                     }}

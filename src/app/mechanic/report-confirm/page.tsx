@@ -295,6 +295,9 @@ export default function MechanicReportConfirmPage() {
   const recordedTime = getLatestRecordedTime(record?.remarks ?? null) || asText(record?.completed_at)
   const latestComment = getLatestComment(record?.remarks ?? null) || '-'
 
+  /** Pair before[i] with after[i] (PDF shows slot grid; preview avoids stacking many thumbs in one row). */
+  const evidencePairCount = Math.min(6, Math.max(beforeImages.length, afterImages.length))
+
   const hasSignature = signatureDataUrl.length > 0
 
   const buildDemoData = () => ({
@@ -927,54 +930,68 @@ export default function MechanicReportConfirmPage() {
                 className="rounded-lg border border-zinc-200 bg-white p-3 text-sm text-zinc-700"
                 style={{ marginLeft: '6px', width: 'calc(100% - 6px)' }}
               >
-                <p className="font-semibold" style={{ marginLeft: '6px' }}>Before Photos</p>
+                <p className="font-semibold" style={{ marginLeft: '6px' }}>
+                  Before / After evidence
+                </p>
                 <div className="mt-2 grid gap-3 md:grid-cols-[minmax(0,1fr)_220px]">
-                  <div>
-                    {beforeImages.length > 0 ? (
-                      <div className="grid grid-cols-3 gap-2">
-                        {beforeImages.slice(0, 6).map((img) => (
-                          <div key={`before-${img.url}`} className="h-24 overflow-hidden rounded border border-zinc-200">
-                            {/* eslint-disable-next-line @next/next/no-img-element -- remote/data-url evidence preview */}
-                            <img src={img.url} alt={img.name} className="h-full w-full object-cover" />
-                          </div>
-                        ))}
-                      </div>
+                  <div className="space-y-4">
+                    {evidencePairCount === 0 ? (
+                      <p className="text-zinc-500" style={{ marginLeft: '6px' }}>
+                        -
+                      </p>
                     ) : (
-                      <p className="mt-1 text-zinc-500" style={{ marginLeft: '6px' }}>-</p>
+                      Array.from({ length: evidencePairCount }, (_, i) => (
+                        <div key={`evidence-pair-${i}`} className="grid grid-cols-2 gap-3">
+                          <div>
+                            <p className="mb-1 text-xs font-semibold text-zinc-600">Before</p>
+                            <div className="flex min-h-[120px] items-center justify-center rounded border border-zinc-200 bg-zinc-50 p-1">
+                              {beforeImages[i] ? (
+                                /* eslint-disable-next-line @next/next/no-img-element -- attachment preview URL */
+                                <img
+                                  src={beforeImages[i].url}
+                                  alt={beforeImages[i].name}
+                                  className="max-h-[min(42vh,280px)] w-full object-contain"
+                                />
+                              ) : (
+                                <span className="text-xs text-zinc-400">—</span>
+                              )}
+                            </div>
+                          </div>
+                          <div>
+                            <p className="mb-1 text-xs font-semibold text-zinc-600">After</p>
+                            <div className="flex min-h-[120px] items-center justify-center rounded border border-zinc-200 bg-zinc-50 p-1">
+                              {afterImages[i] ? (
+                                /* eslint-disable-next-line @next/next/no-img-element -- attachment preview URL */
+                                <img
+                                  src={afterImages[i].url}
+                                  alt={afterImages[i].name}
+                                  className="max-h-[min(42vh,280px)] w-full object-contain"
+                                />
+                              ) : (
+                                <span className="text-xs text-zinc-400">—</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))
                     )}
                   </div>
-                  <div className="rounded-md border border-zinc-200 bg-zinc-50 p-2.5 text-xs text-zinc-700">
-                    <p className="font-semibold">Before Data</p>
-                    <p className="mt-2">
-                      <span className="font-semibold">WorkStarted:</span> {startTime || '-'}
-                    </p>
-                  </div>
-                </div>
-
-                <p className="mt-4 font-semibold" style={{ marginLeft: '6px' }}>After Photos</p>
-                <div className="mt-2 grid gap-3 md:grid-cols-[minmax(0,1fr)_220px]">
-                  <div>
-                    {afterImages.length > 0 ? (
-                      <div className="grid grid-cols-3 gap-2">
-                        {afterImages.slice(0, 6).map((img) => (
-                          <div key={`after-${img.url}`} className="h-24 overflow-hidden rounded border border-zinc-200">
-                            {/* eslint-disable-next-line @next/next/no-img-element -- remote/data-url evidence preview */}
-                            <img src={img.url} alt={img.name} className="h-full w-full object-cover" />
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="mt-1 text-zinc-500" style={{ marginLeft: '6px' }}>-</p>
-                    )}
-                  </div>
-                  <div className="rounded-md border border-zinc-200 bg-zinc-50 p-2.5 text-xs text-zinc-700">
-                    <p className="font-semibold">After Data</p>
-                    <p className="mt-2">
-                      <span className="font-semibold">Recorded:</span> {recordedTime || '-'}
-                    </p>
-                    <p className="mt-1">
-                      <span className="font-semibold">Comment:</span> {latestComment}
-                    </p>
+                  <div className="flex flex-col gap-3">
+                    <div className="rounded-md border border-zinc-200 bg-zinc-50 p-2.5 text-xs text-zinc-700">
+                      <p className="font-semibold">Before Data</p>
+                      <p className="mt-2">
+                        <span className="font-semibold">WorkStarted:</span> {startTime || '-'}
+                      </p>
+                    </div>
+                    <div className="rounded-md border border-zinc-200 bg-zinc-50 p-2.5 text-xs text-zinc-700">
+                      <p className="font-semibold">After Data</p>
+                      <p className="mt-2">
+                        <span className="font-semibold">Recorded:</span> {recordedTime || '-'}
+                      </p>
+                      <p className="mt-1">
+                        <span className="font-semibold">Comment:</span> {latestComment}
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>

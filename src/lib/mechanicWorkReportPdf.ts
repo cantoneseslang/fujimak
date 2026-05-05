@@ -81,7 +81,6 @@ export async function buildMechanicWorkReportPdf(params: {
   invoiceAmount?: number
   invoiceWorkDescription?: string
   maintenanceReport?: MaintenanceReportFormSnapshot | null
-  footerSiteUrl?: string
 }) {
   const {
     request,
@@ -92,7 +91,6 @@ export async function buildMechanicWorkReportPdf(params: {
     invoiceAmount,
     invoiceWorkDescription,
     maintenanceReport,
-    footerSiteUrl,
   } = params
 
   const form = maintenanceReport ?? buildMaintenanceReportFormState(request, null)
@@ -107,7 +105,6 @@ export async function buildMechanicWorkReportPdf(params: {
     size: 'A4',
     margin: 36,
     compress: true,
-    bufferPages: true,
   })
   const chunks: Buffer[] = []
   doc.on('data', (chunk) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)))
@@ -202,14 +199,16 @@ export async function buildMechanicWorkReportPdf(params: {
   }
 
   const drawChecklist = () => {
-    ensureSpace(48)
+    const lineH = 11
+    const headingH = 22
+    const blockH = headingH + MAINTENANCE_CHECKLIST_LABELS.length * lineH + 12
+    ensureSpace(blockH)
     doc.font('Helvetica-Bold').fontSize(10).text('Technical checklist comments')
     doc.moveDown(0.28)
     doc.font('Helvetica').fontSize(7.5)
     for (let i = 0; i < MAINTENANCE_CHECKLIST_LABELS.length; i++) {
       const label = MAINTENANCE_CHECKLIST_LABELS[i]
       const comment = form.checklistComments[i] || 'NA'
-      ensureSpace(11)
       doc.text(`${i + 1}. ${label}`, marginLeft, doc.y, { continued: true })
       doc.font('Helvetica-Bold').text(` — `, { continued: true })
       doc.font('Helvetica').text(comment)
@@ -236,16 +235,10 @@ export async function buildMechanicWorkReportPdf(params: {
   }
 
   const drawPhotoStrip = async (label: string, images: ReportAttachment[], thumbW: number, thumbH: number) => {
+    if (images.length === 0) return
     ensureSpace(thumbH + 34)
     doc.font('Helvetica-Bold').fontSize(9).text(label)
     const rowY = doc.y + 4
-    if (images.length === 0) {
-      doc.rect(marginLeft, rowY, contentW, thumbH).strokeColor('#e4e4e7').lineWidth(0.8).stroke()
-      doc.font('Helvetica').fontSize(8).fillColor('#6b7280').text('No image', marginLeft + 8, rowY + thumbH / 2 - 5)
-      doc.fillColor('#111111')
-      doc.y = rowY + thumbH + 10
-      return
-    }
     let x = marginLeft
     for (const item of images) {
       const buf = await imageBufferFromUrl(item.url)
@@ -362,7 +355,7 @@ export async function buildMechanicWorkReportPdf(params: {
 
   drawInvoiceBlock()
 
-  ensureSpace(118)
+  ensureSpace(96)
   doc.font('Helvetica-Bold').fontSize(10).text('Signatures')
   doc.moveDown(0.25)
   const sigRowY = doc.y + 2
@@ -387,7 +380,7 @@ export async function buildMechanicWorkReportPdf(params: {
   )
   doc.y = sigRowY + 82
 
-  ensureSpace(92)
+  ensureSpace(84)
   doc.font('Helvetica-Bold').fontSize(9).text(`Client: ${form.clientSignatoryName || '(signatory name)'}`)
   const cx = marginLeft
   const cy = doc.y + 4
@@ -404,23 +397,6 @@ export async function buildMechanicWorkReportPdf(params: {
     doc.fillColor('#111111')
   }
   doc.y = cy + 70
-
-  const range = doc.bufferedPageRange()
-  const total = range.count
-  const footerLeft =
-    (footerSiteUrl ? footerSiteUrl.replace(/\/$/, '') : '').slice(0, 92) + (footerSiteUrl && footerSiteUrl.length > 92 ? '…' : '')
-  for (let i = range.start; i < range.start + range.count; i++) {
-    doc.switchToPage(i)
-    const pg = i - range.start + 1
-    const footY = doc.page.height - 32
-    doc.font('Helvetica').fontSize(7).fillColor('#52525b')
-    doc.text(footerLeft || 'FUJIMAK Maintenance Portal', marginLeft, footY, {
-      width: contentW * 0.72,
-      lineBreak: false,
-    })
-    doc.text(`${pg} / ${total}`, marginLeft, footY, { width: contentW, align: 'right', lineBreak: false })
-    doc.fillColor('#111111')
-  }
 
   doc.end()
   return done

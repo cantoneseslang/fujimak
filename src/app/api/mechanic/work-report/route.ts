@@ -4,7 +4,6 @@ import { getSupabaseAdmin } from '@/lib/supabaseAdmin'
 import { buildMechanicWorkReportPdf } from '@/lib/mechanicWorkReportPdf'
 import type { MaintenanceRequestRecord } from '@/lib/maintenance'
 import { buildMaintenanceReportFormState, serializeMaintenanceReportForm } from '@/lib/maintenanceReportForm'
-import { getPublicSiteUrl } from '@/lib/siteUrl'
 
 export const runtime = 'nodejs'
 
@@ -172,7 +171,6 @@ export async function POST(request: NextRequest) {
       issuedAtText: issuedAt,
       signatureDataUrl,
       maintenanceReport: mergedReportForm,
-      footerSiteUrl: getPublicSiteUrl(),
     })
     const filename = `${reportNo}.pdf`
 

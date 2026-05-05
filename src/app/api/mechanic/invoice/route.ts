@@ -8,7 +8,6 @@ import {
 } from '@/lib/documentArchiveStorage'
 import type { MaintenanceRequestRecord } from '@/lib/maintenance'
 import { buildMaintenanceReportFormState } from '@/lib/maintenanceReportForm'
-import { getPublicSiteUrl } from '@/lib/siteUrl'
 
 export const runtime = 'nodejs'
 
@@ -107,7 +106,6 @@ export async function POST(request: NextRequest) {
       invoiceAmount,
       invoiceWorkDescription,
       maintenanceReport: mergedReportForm,
-      footerSiteUrl: getPublicSiteUrl(),
     })
     const filename = `${reportNo}.pdf`
     const archivePath = maintenanceInvoiceArchivePath(requestId, filename)

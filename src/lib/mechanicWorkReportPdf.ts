@@ -277,32 +277,32 @@ export async function buildMechanicWorkReportPdf(params: {
       const [rl, rv] = right
       const L = measureStackedCell(ll, lv, halfW)
       const R = measureStackedCell(rl, rv, halfW)
-      const leftH = L.labelH + 2 + L.valH
-      const rightH = R.labelH + 2 + R.valH
-      const rowH = Math.max(leftH, rightH) + 10
+      const leftH = L.labelH + 1 + L.valH
+      const rightH = R.labelH + 1 + R.valH
+      const rowH = Math.max(leftH, rightH) + 6
 
-      ensureSpace(rowH + 6)
+      ensureSpace(rowH + 4)
       const rowTop = doc.y
       const rx = marginLeft + halfW + colGap
 
       doc.font('Helvetica').fontSize(7).fillColor('#64748b')
       doc.text(`${ll}:`, marginLeft, rowTop, { width: halfW })
       doc.font('Helvetica').fontSize(8.5).fillColor('#111111')
-      doc.text(L.valueDisp, marginLeft, rowTop + L.labelH + 2, { width: halfW })
+      doc.text(L.valueDisp, marginLeft, rowTop + L.labelH + 1, { width: halfW })
 
       doc.font('Helvetica').fontSize(7).fillColor('#64748b')
       doc.text(`${rl}:`, rx, rowTop, { width: halfW })
       doc.font('Helvetica').fontSize(8.5).fillColor('#111111')
-      doc.text(R.valueDisp, rx, rowTop + R.labelH + 2, { width: halfW })
+      doc.text(R.valueDisp, rx, rowTop + R.labelH + 1, { width: halfW })
 
-      const lineY = rowTop + rowH - 4
+      const lineY = rowTop + rowH - 3
       doc.moveTo(marginLeft, lineY).lineTo(marginRight, lineY).strokeColor('#e5e7eb').lineWidth(0.55).stroke()
 
       doc.y = rowTop + rowH
       doc.fillColor('#111111')
     }
 
-    doc.moveDown(0.25)
+    doc.moveDown(0.15)
     doc.x = marginLeft
   }
 

@@ -153,13 +153,12 @@ export async function buildMechanicWorkReportPdf(params: {
 
     const metaX = marginLeft + contentW - 148
     doc.font('Helvetica').fontSize(8).fillColor('#374151')
-    doc.text(asText(form.formCode) || 'FPC011', metaX, bandTop, { width: 140, align: 'right' })
-    doc.text(`Operation Date: ${form.operationDateText}`, metaX, bandTop + 11, { width: 140, align: 'right' })
-    doc.text(`Report No: ${reportNo}`, metaX, bandTop + 22, { width: 140, align: 'right' })
-    doc.text(`Issued: ${issuedAtText}`, metaX, bandTop + 33, { width: 140, align: 'right' })
+    doc.text(`Operation Date: ${form.operationDateText}`, metaX, bandTop, { width: 140, align: 'right' })
+    doc.text(`Report No: ${reportNo}`, metaX, bandTop + 11, { width: 140, align: 'right' })
+    doc.text(`Issued: ${issuedAtText}`, metaX, bandTop + 22, { width: 140, align: 'right' })
     doc.fillColor('#111111')
 
-    doc.y = bandTop + Math.max(logoH, 46)
+    doc.y = bandTop + Math.max(logoH, 38)
     doc.moveDown(0.35)
   }
 
@@ -183,7 +182,7 @@ export async function buildMechanicWorkReportPdf(params: {
     doc.moveDown(0.2)
   }
 
-  /** Matches report-confirm preview: two columns × six rows, label above value. */
+  /** Matches report-confirm preview: two-column pairs + Symptom row (operation date only in header band). */
   const drawHeaderTwoColumnGrid = () => {
     const colGap = 16
     const halfW = (contentW - colGap) / 2
@@ -193,7 +192,6 @@ export async function buildMechanicWorkReportPdf(params: {
       [['Machine', form.equipmentLabel], ['Model', form.brand]],
       [['Serial', form.serialNumber], ['Start Time', form.startTimeDisplay]],
       [['Finish Time', form.finishTimeDisplay], ['Form code', asText(form.formCode) || 'FPC011']],
-      [['Operation date (printed)', form.operationDateText], ['Symptom', asText(request.symptom) || '—']],
     ]
 
     const measureStackedCell = (label: string, rawValue: string, cellW: number) => {
@@ -234,6 +232,26 @@ export async function buildMechanicWorkReportPdf(params: {
       doc.y = rowTop + rowH
       doc.fillColor('#111111')
     }
+
+    const symLabel = 'Symptom'
+    const symVal = asText(request.symptom) || '—'
+    doc.font('Helvetica').fontSize(7).fillColor('#64748b')
+    const slh = doc.heightOfString(`${symLabel}:`, { width: contentW })
+    doc.font('Helvetica').fontSize(8.5).fillColor('#111111')
+    const svh = doc.heightOfString(symVal, { width: contentW })
+    const symRowH = slh + 2 + svh + 10
+
+    ensureSpace(symRowH + 6)
+    const symTop = doc.y
+    doc.font('Helvetica').fontSize(7).fillColor('#64748b')
+    doc.text(`${symLabel}:`, marginLeft, symTop, { width: contentW })
+    doc.font('Helvetica').fontSize(8.5).fillColor('#111111')
+    doc.text(symVal, marginLeft, symTop + slh + 2, { width: contentW })
+    const symLineY = symTop + symRowH - 4
+    doc.moveTo(marginLeft, symLineY).lineTo(marginRight, symLineY).strokeColor('#e5e7eb').lineWidth(0.55).stroke()
+    doc.y = symTop + symRowH
+    doc.fillColor('#111111')
+
     doc.moveDown(0.25)
   }
 
@@ -253,20 +271,43 @@ export async function buildMechanicWorkReportPdf(params: {
   }
 
   const drawChecklist = () => {
-    const lineH = 11
-    const headingH = 22
-    const blockH = headingH + MAINTENANCE_CHECKLIST_LABELS.length * lineH + 12
-    ensureSpace(blockH)
+    const colGap = 14
+    const halfW = (contentW - colGap) / 2
+    const n = MAINTENANCE_CHECKLIST_LABELS.length
+    const half = Math.ceil(n / 2)
+
+    ensureSpace(26)
     doc.font('Helvetica-Bold').fontSize(10).text('Technical checklist comments')
     doc.moveDown(0.28)
-    doc.font('Helvetica').fontSize(7.5)
-    for (let i = 0; i < MAINTENANCE_CHECKLIST_LABELS.length; i++) {
-      const label = MAINTENANCE_CHECKLIST_LABELS[i]
-      const comment = form.checklistComments[i] || 'NA'
-      doc.text(`${i + 1}. ${label}`, marginLeft, doc.y, { continued: true })
-      doc.font('Helvetica-Bold').text(` — `, { continued: true })
-      doc.font('Helvetica').text(comment)
+    doc.font('Helvetica').fontSize(7.5).fillColor('#111111')
+
+    for (let r = 0; r < half; r++) {
+      const iLeft = r
+      const iRight = r + half
+      const labelL = MAINTENANCE_CHECKLIST_LABELS[iLeft]
+      const commentL = form.checklistComments[iLeft] || 'NA'
+      const lineL = `${iLeft + 1}. ${labelL} — ${commentL}`
+
+      let lineR = ''
+      if (iRight < n) {
+        const labelR = MAINTENANCE_CHECKLIST_LABELS[iRight]
+        const commentR = form.checklistComments[iRight] || 'NA'
+        lineR = `${iRight + 1}. ${labelR} — ${commentR}`
+      }
+
+      const hL = doc.heightOfString(lineL, { width: halfW })
+      const hR = lineR ? doc.heightOfString(lineR, { width: halfW }) : 0
+      const rowH = Math.max(hL, hR, 10) + 5
+
+      ensureSpace(rowH + 2)
+      const rowTop = doc.y
+      doc.text(lineL, marginLeft, rowTop, { width: halfW })
+      if (lineR) {
+        doc.text(lineR, marginLeft + halfW + colGap, rowTop, { width: halfW })
+      }
+      doc.y = rowTop + rowH
     }
+    doc.fillColor('#111111')
     doc.moveDown(0.35)
   }
 

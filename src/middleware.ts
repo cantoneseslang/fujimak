@@ -5,8 +5,11 @@ import {
   ensureAccessForIdentifier,
   normalizeIdentifier,
 } from "@/lib/accessPolicy";
+import { locales, type Locale } from "@/i18n/config";
+import { negotiateLocaleFromAcceptLanguage } from "@/i18n/negotiateLocale";
 
 const TEST_CODE_COOKIE = "fujimak_test_code";
+const LOCALE_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 const env = (value: string | undefined) => (typeof value === "string" ? value.trim() : "");
 const AUTH_CHECK_TIMEOUT_MS = 2500;
 
@@ -66,23 +69,47 @@ async function withTimeout<T>(task: Promise<T>, ms: number) {
   }
 }
 
+/** 有効な locale Cookie が無いときだけ Accept-Language で決めて固定（以降は Cookie のみ）。 */
+function ensureLocaleCookie(request: NextRequest, response: NextResponse) {
+  const { pathname } = request.nextUrl;
+  if (pathname.startsWith("/api")) return response;
+
+  const raw = request.cookies.get("locale")?.value;
+  if (raw && locales.includes(raw as Locale)) return response;
+
+  const negotiated = negotiateLocaleFromAcceptLanguage(
+    request.headers.get("accept-language"),
+  );
+  response.cookies.set("locale", negotiated, {
+    path: "/",
+    maxAge: LOCALE_COOKIE_MAX_AGE,
+    httpOnly: false,
+    sameSite: "lax",
+  });
+  return response;
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  if (pathname.startsWith("/auth") || pathname.startsWith("/api")) {
+  if (pathname.startsWith("/api")) {
     return NextResponse.next();
+  }
+
+  if (pathname.startsWith("/auth")) {
+    return ensureLocaleCookie(request, NextResponse.next());
   }
 
   if (!isProtectedPath(pathname)) {
-    return NextResponse.next();
+    return ensureLocaleCookie(request, NextResponse.next());
   }
 
   if (isBackgroundNavigationRequest(request)) {
-    return NextResponse.next();
+    return ensureLocaleCookie(request, NextResponse.next());
   }
 
   if (shouldBypassAuthInDev(request)) {
-    return NextResponse.next();
+    return ensureLocaleCookie(request, NextResponse.next());
   }
 
   const url = env(process.env.NEXT_PUBLIC_FUJIMAK_SUPABASE_URL) || env(process.env.NEXT_PUBLIC_SUPABASE_URL);
@@ -95,7 +122,7 @@ export async function middleware(request: NextRequest) {
     const u = request.nextUrl.clone();
     u.pathname = "/auth/sign-in";
     u.searchParams.set("errorCode", "supabase_env_missing");
-    return NextResponse.redirect(u);
+    return ensureLocaleCookie(request, NextResponse.redirect(u));
   }
 
   const admin = createClient(url, serviceRoleKey, {
@@ -140,11 +167,11 @@ export async function middleware(request: NextRequest) {
         AUTH_CHECK_TIMEOUT_MS,
       );
       if (testAccess.allowed) {
-        return response;
+        return ensureLocaleCookie(request, response);
       }
       response.cookies.delete(TEST_CODE_COOKIE);
     } catch {
-      return response;
+      return ensureLocaleCookie(request, response);
     }
   }
 
@@ -153,13 +180,13 @@ export async function middleware(request: NextRequest) {
     const authResult = await withTimeout(supabase.auth.getUser(), AUTH_CHECK_TIMEOUT_MS);
     user = authResult.data.user;
   } catch {
-    return response;
+    return ensureLocaleCookie(request, response);
   }
 
   if (!user || !user.email) {
     const signIn = request.nextUrl.clone();
     signIn.pathname = "/auth/sign-in";
-    return NextResponse.redirect(signIn);
+    return ensureLocaleCookie(request, NextResponse.redirect(signIn));
   }
 
   let emailAccess:
@@ -176,17 +203,17 @@ export async function middleware(request: NextRequest) {
       AUTH_CHECK_TIMEOUT_MS,
     );
   } catch {
-    return response;
+    return ensureLocaleCookie(request, response);
   }
 
   if (!emailAccess || !emailAccess.allowed) {
     const signIn = request.nextUrl.clone();
     signIn.pathname = "/auth/sign-in";
     signIn.searchParams.set("errorCode", `access_${emailAccess?.reason ?? "unknown"}`);
-    return NextResponse.redirect(signIn);
+    return ensureLocaleCookie(request, NextResponse.redirect(signIn));
   }
 
-  return response;
+  return ensureLocaleCookie(request, response);
 }
 
 export const config = {

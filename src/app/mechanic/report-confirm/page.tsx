@@ -850,18 +850,19 @@ export default function MechanicReportConfirmPage() {
                 <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
                   <p className="mb-2 font-semibold text-zinc-900">FOR</p>
                   <dl className="grid gap-2 text-xs sm:grid-cols-2">
-                    <div className="border-b border-zinc-200/80 pb-1.5">
-                      <dt className="font-medium text-zinc-600">Warranty</dt>
-                      <dd className="mt-0.5 text-zinc-800">{reportForm.forBilling === 'warranty' ? 'Yes' : '—'}</dd>
-                    </div>
-                    <div className="border-b border-zinc-200/80 pb-1.5">
-                      <dt className="font-medium text-zinc-600">Billing</dt>
-                      <dd className="mt-0.5 text-zinc-800">{reportForm.forBilling === 'billing' ? 'Yes' : '—'}</dd>
-                    </div>
                     <div className="border-b border-zinc-200/80 pb-1.5 sm:col-span-2">
-                      <dt className="font-medium text-zinc-600">If For Billing (note)</dt>
-                      <dd className="mt-0.5 whitespace-pre-wrap text-zinc-800">{asText(reportForm.billingNote) || '—'}</dd>
+                      <dt className="font-medium text-zinc-600">
+                        {reportForm.forBilling === 'warranty' ? 'Warranty' : 'Billing'}
+                      </dt>
                     </div>
+                    {reportForm.forBilling === 'billing' ? (
+                      <div className="border-b border-zinc-200/80 pb-1.5 sm:col-span-2">
+                        <dt className="font-medium text-zinc-600">If For Billing (note)</dt>
+                        <dd className="mt-0.5 whitespace-pre-wrap text-zinc-800">
+                          {asText(reportForm.billingNote) || '—'}
+                        </dd>
+                      </div>
+                    ) : null}
                   </dl>
                   <div className="mt-3 space-y-2 border-t border-zinc-200 pt-3 text-xs">
                     <div>

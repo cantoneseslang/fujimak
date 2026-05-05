@@ -351,12 +351,16 @@ export async function buildMechanicWorkReportPdf(params: {
     ['Finish Time', form.finishTimeDisplay],
   ])
 
-  // 2. FOR — warranty / billing, then narrative fields in form order
-  drawLabelValueRows([
-    ['Warranty', form.forBilling === 'warranty' ? 'Yes' : '—'],
-    ['Billing', form.forBilling === 'billing' ? 'Yes' : '—'],
-    ['If For Billing (note)', form.billingNote || '—'],
-  ])
+  // 2. FOR — show selected classification only (Warranty XOR Billing)
+  doc.font('Helvetica-Bold').fontSize(9).text('FOR')
+  doc.moveDown(0.3)
+  doc.font('Helvetica-Bold').fontSize(9).text(form.forBilling === 'warranty' ? 'Warranty' : 'Billing')
+  doc.fillColor('#111111')
+  doc.moveDown(0.4)
+
+  if (form.forBilling === 'billing') {
+    drawLabelValueRows([['If For Billing (note)', form.billingNote || '—']])
+  }
 
   drawBoxParagraph('Concern', form.concern, 44)
   drawBoxParagraph('Action Taken', form.actionTaken, 52)

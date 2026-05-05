@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
+import Header from '@/components/Header'
+import BottomNav from '@/components/BottomNav'
 
 type Mechanic = {
   id: string
@@ -38,6 +41,7 @@ function asText(value: unknown) {
 
 export default function MechanicBoardPage() {
   const router = useRouter()
+  const tm = useTranslations('mechanic')
   const [mechanics, setMechanics] = useState<Mechanic[]>([])
   const [mechanicsError, setMechanicsError] = useState<string | null>(null)
   const [selectedMechanicId, setSelectedMechanicId] = useState<string>('')
@@ -153,11 +157,13 @@ export default function MechanicBoardPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 p-4 pb-28">
+    <div className="min-h-screen bg-gray-50">
+      <Header showBack backHref="/dashboard" title={tm('boardTitle')} />
+
+      <main className="px-4 py-5 sm:px-4 sm:py-6" style={{ paddingBottom: '300px' }}>
       <div className="mx-auto max-w-3xl space-y-4">
         <section className="rounded-xl border border-gray-200 bg-white p-4">
-          <h1 className="text-lg font-semibold text-gray-900">Mechanic Board</h1>
-          <p className="mt-1 text-sm text-gray-600">
+          <p className="text-sm text-gray-600">
             Login and check your assigned schedule, then open the work screen.
           </p>
           <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-[1fr_180px_auto]">
@@ -259,6 +265,9 @@ export default function MechanicBoardPage() {
           )}
         </section>
       </div>
-    </main>
+      </main>
+
+      <BottomNav />
+    </div>
   )
 }

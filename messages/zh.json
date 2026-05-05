@@ -276,6 +276,7 @@
   },
   "mechanic": {
     "title": "技師作業記錄",
+    "boardTitle": "技師工作台",
     "subtitle": "先選擇已排程案件，開始作業後保存前後證據。",
     "loading": "正在載入作業案件...",
     "demoModeNotice": "目前沒有排程案件，已自動顯示示範案件供流程演練。",

@@ -18,6 +18,8 @@ const MECHANIC_OPERATION_MODE_KEY = 'mechanic-operation-mode-v1'
 
 interface HeaderProps {
   showBack?: boolean
+  /** With showBack: go here instead of browser history (reliable “top” from deep links). */
+  backHref?: string
   showMenu?: boolean
   title?: string
   titleClassName?: string
@@ -27,6 +29,7 @@ interface HeaderProps {
 
 export default function Header({ 
   showBack = false, 
+  backHref,
   showMenu = true, 
   title,
   titleClassName,
@@ -123,7 +126,9 @@ export default function Header({
           <div className="w-11 sm:w-14">
             {showBack ? (
               <button 
-                onClick={() => router.back()}
+                type="button"
+                aria-label={backHref ? 'Back to home' : 'Back'}
+                onClick={() => (backHref ? router.push(backHref) : router.back())}
                 className="rounded-full p-1.5 -ml-1.5 transition-colors hover:bg-gray-100 sm:p-2 sm:-ml-2"
               >
                 <ChevronLeft className="h-8 w-8 text-gray-700 sm:h-10 sm:w-10" />

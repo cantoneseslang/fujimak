@@ -276,6 +276,7 @@
   },
   "mechanic": {
     "title": "Mechanic Work Record",
+    "boardTitle": "Mechanic Board",
     "subtitle": "Pumili ng naka-schedule na trabaho, simulan ito, at i-save ang before/after ebidensya.",
     "loading": "Naglo-load ng mga naka-schedule na trabaho...",
     "demoModeNotice": "Walang naka-schedule na trabaho, kaya demo sample muna ang ipinapakita para sa practice.",

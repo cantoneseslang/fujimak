@@ -276,6 +276,7 @@
   },
   "mechanic": {
     "title": "Mechanic Work Record",
+    "boardTitle": "Mechanic Board",
     "subtitle": "Select a scheduled job, start work, then save before/after evidence.",
     "loading": "Loading scheduled jobs...",
     "demoModeNotice": "No scheduled jobs found, so a demo sample is shown for workflow practice.",

@@ -427,11 +427,11 @@ export async function buildMechanicWorkReportPdf(params: {
   ) => {
     doc.rect(x, y, w, h).strokeColor('#d4d4d8').lineWidth(0.8).stroke()
     doc.font('Helvetica-Bold').fontSize(8).text(title, x + 6, y + 4)
-    doc.font('Helvetica').fontSize(8).text(name || '-', x + 6, y + 16)
+    doc.font('Helvetica').fontSize(8).text(name || '-', x + 6, y + 15)
     const buf = sigUrl ? await imageBufferFromUrl(asText(sigUrl)) : null
     if (buf) {
       try {
-        doc.image(buf, x + 6, y + 28, { fit: [w - 12, h - 34], valign: 'bottom' })
+        doc.image(buf, x + 6, y + 26, { fit: [w - 12, h - 32], valign: 'bottom' })
       } catch {
         /* skip */
       }
@@ -472,6 +472,7 @@ export async function buildMechanicWorkReportPdf(params: {
   doc.moveDown(0.25)
   const sigRowY = doc.y + 2
   const half = (contentW - 10) / 2
+  const sigCellH = 64
   await drawSignatureCell(
     'Technician',
     form.technicianName,
@@ -479,7 +480,7 @@ export async function buildMechanicWorkReportPdf(params: {
     marginLeft,
     sigRowY,
     half,
-    76
+    sigCellH
   )
   await drawSignatureCell(
     'Supervisor',
@@ -488,9 +489,9 @@ export async function buildMechanicWorkReportPdf(params: {
     marginLeft + half + 10,
     sigRowY,
     half,
-    76
+    sigCellH
   )
-  doc.y = sigRowY + 82
+  doc.y = sigRowY + sigCellH + 6
 
   ensureSpace(84)
   doc.x = marginLeft

@@ -6,6 +6,7 @@ import { Menu, ChevronLeft, X, Settings, Bell, LogOut, Globe } from 'lucide-reac
 import { useRouter } from 'next/navigation'
 import { useLocale, useTranslations } from 'next-intl'
 import { signOut } from '@/app/auth/actions'
+import { FUJIMAK_LOCALE_STORAGE_KEY, locales, type Locale } from '@/i18n/config'
 
 const LANGUAGES = [
   { code: 'ja', name: '日本語' },
@@ -49,6 +50,9 @@ export default function Header({
 
   const handleLanguageChange = (nextLocale: string) => {
     setIsLangOpen(false)
+    if (locales.includes(nextLocale as Locale)) {
+      localStorage.setItem(FUJIMAK_LOCALE_STORAGE_KEY, nextLocale)
+    }
     const redirectTo = `${window.location.pathname}${window.location.search}`
     window.location.assign(
       `/api/locale?locale=${encodeURIComponent(nextLocale)}&redirect=${encodeURIComponent(redirectTo)}`

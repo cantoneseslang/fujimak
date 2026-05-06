@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Globe, Check } from 'lucide-react'
-import { locales, localeNames, type Locale } from '@/i18n/config'
+import { locales, localeNames, FUJIMAK_LOCALE_STORAGE_KEY, type Locale } from '@/i18n/config'
 
 interface LanguageSwitcherProps {
   currentLocale: Locale
@@ -14,6 +14,7 @@ export default function LanguageSwitcher({ currentLocale, onLocaleChange }: Lang
   const [isOpen, setIsOpen] = useState(false)
 
   const handleSelect = (locale: Locale) => {
+    localStorage.setItem(FUJIMAK_LOCALE_STORAGE_KEY, locale)
     onLocaleChange?.(locale)
     setIsOpen(false)
     const redirectTo = `${window.location.pathname}${window.location.search}`

@@ -12,3 +12,6 @@ export const localeNames: Record<Locale, string> = {
 }
 
 export const defaultLocale: Locale = 'en'
+
+/** Client mirrors successful locale cookie here; used to restore cookie if the browser drops it. */
+export const FUJIMAK_LOCALE_STORAGE_KEY = 'fujimak-locale-v1'

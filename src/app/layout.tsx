@@ -3,6 +3,7 @@ import { NextIntlClientProvider } from 'next-intl'
 import { getLocale, getMessages } from 'next-intl/server'
 import { Analytics } from '@vercel/analytics/react'
 import VisitorTracker from '@/components/VisitorTracker'
+import LocalePersistence from '@/components/LocalePersistence'
 import './globals.css'
 
 /** Cookie で語が変わるため、レイアウトを静的キャッシュしない（古い messages が残るのを防ぐ） */
@@ -44,6 +45,7 @@ export default async function RootLayout({
       </head>
       <body suppressHydrationWarning>
         <NextIntlClientProvider key={locale} locale={locale} messages={messages}>
+          <LocalePersistence />
           <VisitorTracker />
           {children}
         </NextIntlClientProvider>

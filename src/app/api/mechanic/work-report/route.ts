@@ -49,6 +49,20 @@ function asErrorMessage(error: unknown) {
   }
 }
 
+async function withTimeout<T>(task: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | null = null
+  try {
+    return await Promise.race<T>([
+      task,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label}_timeout`)), ms)
+      }),
+    ])
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
+
 function extractMissingColumnName(message: string) {
   const singleQuoted = message.match(/'([^']+)' column/)
   if (singleQuoted?.[1]) return singleQuoted[1]
@@ -174,13 +188,17 @@ export async function POST(request: NextRequest) {
     )}`
     const mergedReportForm = buildMaintenanceReportFormState(record, maintenanceReportRaw)
 
-    const pdfBuffer = await buildMechanicWorkReportPdf({
-      request: record,
-      reportNo,
-      issuedAtText: issuedAt,
-      signatureDataUrl,
-      maintenanceReport: mergedReportForm,
-    })
+    const pdfBuffer = await withTimeout(
+      buildMechanicWorkReportPdf({
+        request: record,
+        reportNo,
+        issuedAtText: issuedAt,
+        signatureDataUrl,
+        maintenanceReport: mergedReportForm,
+      }),
+      20000,
+      'pdf_build'
+    )
     const filename = `${reportNo}.pdf`
 
     const targetEmail = customerEmailFromBody || normalizeEmail(record.requested_email)
@@ -208,12 +226,13 @@ export async function POST(request: NextRequest) {
             `Completed At: ${asText(record.completed_at) || issuedAt}`,
           ].join('\n')
 
-          await transporter.sendMail({
-            from: fromHeader,
-            to: targetEmail,
-            subject,
-            text,
-            html: `
+          await withTimeout(
+            transporter.sendMail({
+              from: fromHeader,
+              to: targetEmail,
+              subject,
+              text,
+              html: `
               <div style="font-family:Arial,sans-serif;padding:18px;max-width:560px;color:#111827;">
                 <h2 style="margin:0 0 12px 0;">${subject}</h2>
                 <p style="margin:0 0 6px 0;"><strong>Report No:</strong> ${reportNo}</p>
@@ -235,7 +254,10 @@ export async function POST(request: NextRequest) {
                 contentType: 'application/pdf',
               },
             ],
-          })
+            }),
+            20000,
+            'smtp_send'
+          )
           emailSent = true
         } catch (error) {
           const raw = asErrorMessage(error)

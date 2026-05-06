@@ -195,6 +195,7 @@ export async function POST(request: NextRequest) {
         issuedAtText: issuedAt,
         signatureDataUrl,
         maintenanceReport: mergedReportForm,
+        disableImages: shouldSend,
       }),
       20000,
       'pdf_build'

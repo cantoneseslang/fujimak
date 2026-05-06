@@ -147,6 +147,7 @@ export async function buildMechanicWorkReportPdf(params: {
   invoiceAmount?: number
   invoiceWorkDescription?: string
   maintenanceReport?: MaintenanceReportFormSnapshot | null
+  disableImages?: boolean
 }) {
   const {
     request,
@@ -157,6 +158,7 @@ export async function buildMechanicWorkReportPdf(params: {
     invoiceAmount,
     invoiceWorkDescription,
     maintenanceReport,
+    disableImages = false,
   } = params
 
   const form = maintenanceReport ?? buildMaintenanceReportFormState(request, null)
@@ -458,7 +460,7 @@ export async function buildMechanicWorkReportPdf(params: {
     const rowY = doc.y + 4
     let x = marginLeft
     for (const item of images) {
-      const buf = await imageBufferFromUrl(item.url)
+      const buf = disableImages ? null : await imageBufferFromUrl(item.url)
       doc.rect(x, rowY, thumbW, thumbH).strokeColor('#d4d4d8').lineWidth(0.8).stroke()
       if (buf) {
         try {
@@ -505,8 +507,8 @@ export async function buildMechanicWorkReportPdf(params: {
 
     const primaryBefore = beforeImages.at(-1)
     const primaryAfter = afterImages.at(-1)
-    const beforeBuf = primaryBefore ? await imageBufferFromUrl(primaryBefore.url) : null
-    const afterBuf = primaryAfter ? await imageBufferFromUrl(primaryAfter.url) : null
+    const beforeBuf = disableImages || !primaryBefore ? null : await imageBufferFromUrl(primaryBefore.url)
+    const afterBuf = disableImages || !primaryAfter ? null : await imageBufferFromUrl(primaryAfter.url)
 
     let maxPhotoH = 220
     let rowH = placeholderMin
@@ -593,7 +595,7 @@ export async function buildMechanicWorkReportPdf(params: {
     doc.rect(x, y, w, h).strokeColor('#d4d4d8').lineWidth(0.8).stroke()
     doc.font('Helvetica-Bold').fontSize(8).text(title, x + 6, y + 4)
     doc.font('Helvetica').fontSize(8).fillColor('#111111').text(name || '-', x + 6, y + 15)
-    const buf = sigUrl ? await imageBufferFromUrl(asText(sigUrl)) : null
+    const buf = disableImages || !sigUrl ? null : await imageBufferFromUrl(asText(sigUrl))
     if (buf) {
       try {
         doc.image(buf, x + 6, y + 26, { fit: [w - 12, h - 32], valign: 'bottom' })

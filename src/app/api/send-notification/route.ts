@@ -1,7 +1,6 @@
 import { fetchNotificationRecipientEmails } from '@/lib/notificationEmailsCompat'
-import { resolveSmtpConfigFromSettings } from '@/lib/smtpNotificationSettings'
+import { createSmtpTransport, resolveEffectiveSmtpConfig } from '@/lib/effectiveSmtpConfig'
 import { NextRequest, NextResponse } from 'next/server'
-import nodemailer from 'nodemailer'
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin'
 
 /** Gmail SMTP — official App Password steps (not Passkeys); hints/UI link here first */
@@ -69,7 +68,8 @@ async function resolveRecipients(options: {
   const settingsRecipients = normalizeRecipients(await fetchNotificationRecipientEmails(supabase))
   if (settingsRecipients.length > 0) return settingsRecipients
 
-  const fallback = asText(process.env.SMTP_USER || 'info@lifesupporthk.com').toLowerCase()
+  const smtpConfig = await resolveEffectiveSmtpConfig()
+  const fallback = asText(smtpConfig?.user || process.env.SMTP_USER || 'info@lifesupporthk.com').toLowerCase()
   return fallback.length > 0 ? [fallback] : []
 }
 
@@ -91,8 +91,6 @@ function smtpUserFacingHint(errorMessage: string): string | undefined {
 }
 
 export async function POST(request: NextRequest) {
-  let smtpPassSource: 'env' | 'database' | 'none' = 'none'
-
   try {
     const {
       type,
@@ -113,12 +111,8 @@ export async function POST(request: NextRequest) {
       requestId,
     } = await request.json()
 
-    const smtpSettings = await resolveSmtpConfigFromSettings()
-    const envPass = asText(process.env.SMTP_PASS)
-    const dbPass = asText(smtpSettings?.pass)
-    smtpPassSource = envPass ? 'env' : dbPass ? 'database' : 'none'
-    const smtpPass = envPass || dbPass
-    if (!smtpPass) {
+    const smtpConfig = await resolveEffectiveSmtpConfig()
+    if (!smtpConfig) {
       return NextResponse.json({
         success: true,
         delivered: false,
@@ -162,19 +156,7 @@ export async function POST(request: NextRequest) {
     recentIdempotency.set(key, nowMs)
 
     // SMTPトランスポーターを作成
-    const transporter = nodemailer.createTransport({
-      host: asText(process.env.SMTP_HOST) || asText(smtpSettings?.host) || 'smtp.gmail.com',
-      port: Number(asText(process.env.SMTP_PORT) || asText(smtpSettings?.port) || '465'),
-      secure:
-        String(
-          asText(process.env.SMTP_SECURE) ||
-            (smtpSettings?.secure === false ? 'false' : 'true')
-        ) !== 'false',
-      auth: {
-        user: asText(process.env.SMTP_USER) || asText(smtpSettings?.user) || 'info@lifesupporthk.com',
-        pass: smtpPass,
-      },
-    })
+    const transporter = createSmtpTransport(smtpConfig)
 
     // 日時を取得
     const now = new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })
@@ -277,12 +259,7 @@ export async function POST(request: NextRequest) {
 
     // メール送信
     const info = await transporter.sendMail({
-      from:
-        asText(process.env.SMTP_FROM) ||
-        asText(smtpSettings?.from) ||
-        `"Fujimak Maintenance" <${
-          asText(process.env.SMTP_USER) || asText(smtpSettings?.user) || 'info@lifesupporthk.com'
-        }>`,
+      from: smtpConfig.from,
       to: recipients.join(', '),
       subject: subject,
       text: `${message}${maintenanceInfoText ? `\n\n${maintenanceInfoText}` : ''}`,
@@ -311,13 +288,8 @@ export async function POST(request: NextRequest) {
       /application-specific password/i.test(errorMessage) ||
       /invalidsecondfactor/i.test(errorMessage.toLowerCase())
     if (hint && needsAppPassword) {
-      if (smtpPassSource === 'env') {
-        hint +=
-          '\n\n【重要】いま認証に使っているのは Vercel の環境変数 SMTP_PASS です。Settings でパスワードを変えても、SMTP_PASS が設定されている限りそちらが優先されます。SMTP_PASS の値を「Google が発行したアプリパスワード」だけに差し替え、保存後に Redeploy してください（スペースは削除して16文字をそのまま貼り付け）。'
-      } else if (smtpPassSource === 'database') {
-        hint +=
-          '\n\n【重要】いま認証に使っているのは Settings に保存した SMTP パスワードです。SMTP Password にアプリパスワードを入れて Save してください。なお Vercel に SMTP_PASS が入っているとそちらが優先され、Settings は無視されます。'
-      }
+      hint +=
+        '\n\n【重要】現在は「Settings の SMTP 設定」が優先され、未設定の場合のみ Vercel の SMTP_* 環境変数を使います。Settings の SMTP Password をアプリパスワードに更新し、必要なら Vercel 側も同じ値へ揃えてください。'
       hint +=
         '\n\n会社の Google Workspace で管理者がアプリパスワードを禁止している場合は、Gmail SMTP は使えません。SendGrid / Resend 等への切り替えが必要です。'
     }

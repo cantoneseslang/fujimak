@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import nodemailer from 'nodemailer'
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin'
-import { resolveSmtpConfigFromSettings } from '@/lib/smtpNotificationSettings'
+import { createSmtpTransport, resolveEffectiveSmtpConfig } from '@/lib/effectiveSmtpConfig'
 import { explainSmtpFailure } from '@/lib/smtpExplainError'
 import { buildMechanicWorkReportPdf } from '@/lib/mechanicWorkReportPdf'
 import type { MaintenanceRequestRecord } from '@/lib/maintenance'
@@ -48,6 +47,14 @@ function asErrorMessage(error: unknown) {
   } catch {
     return 'Unknown error'
   }
+}
+
+function extractMissingColumnName(message: string) {
+  const singleQuoted = message.match(/'([^']+)' column/)
+  if (singleQuoted?.[1]) return singleQuoted[1]
+  const doubleQuoted = message.match(/column "([^"]+)"/)
+  if (doubleQuoted?.[1]) return doubleQuoted[1]
+  return ''
 }
 
 function buildDemoRecord(payload: DemoReportPayload): MaintenanceRequestRecord {
@@ -181,38 +188,13 @@ export async function POST(request: NextRequest) {
     let emailError = ''
     let stateUpdateError = ''
     if (shouldSend && targetEmail) {
-      const smtpSettings = await resolveSmtpConfigFromSettings()
-      const dbPass = asText(smtpSettings?.pass)
-      const envPass = asText(process.env.SMTP_PASS)
-      /** Keep behavior consistent with Settings SMTP test: saved DB config wins, env is fallback only. */
-      const smtpPass = dbPass || envPass
-      if (!smtpPass) {
+      const smtpConfig = await resolveEffectiveSmtpConfig()
+      if (!smtpConfig) {
         emailError = 'Missing SMTP password (set Vercel SMTP_PASS or Settings → SMTP Password).'
       } else {
         try {
-          const authUser =
-            asText(smtpSettings?.user) || asText(process.env.SMTP_USER) || 'info@lifesupporthk.com'
-          const transporter = nodemailer.createTransport({
-            host: asText(smtpSettings?.host) || asText(process.env.SMTP_HOST) || 'smtp.gmail.com',
-            port: Number(asText(smtpSettings?.port) || asText(process.env.SMTP_PORT) || '465'),
-            secure:
-              String(
-                smtpSettings?.secure === false
-                  ? 'false'
-                  : smtpSettings?.secure === true
-                    ? 'true'
-                    : asText(process.env.SMTP_SECURE) || 'true'
-              ) !== 'false',
-            auth: {
-              user: authUser,
-              pass: smtpPass,
-            },
-          })
-
-          const fromHeader =
-            asText(smtpSettings?.from) ||
-            asText(process.env.SMTP_FROM) ||
-            `"Fujimak Maintenance" <${authUser}>`
+          const transporter = createSmtpTransport(smtpConfig)
+          const fromHeader = smtpConfig.from
 
           const subject = `Maintenance Report (${asText(record.store_name) || asText(record.store_id)})`
           const machineLabel = asText(record.machine_name) || asText(record.machine_model) || '-'
@@ -287,17 +269,18 @@ export async function POST(request: NextRequest) {
           patch.completed_at = null
         }
         const supabase = getSupabaseAdmin()
-        let updateError = (
-          await supabase.from('maintenance_requests').update(patch).eq('id', requestId)
-        ).error
-        if (
-          updateError &&
-          /mechanic_report_snapshot|schema cache|could not find|does not exist/i.test(asErrorMessage(updateError))
-        ) {
-          const { mechanic_report_snapshot: _snap, ...withoutSnap } = patch
+        const patchForLegacySchema: Record<string, unknown> = { ...patch }
+        let updateError = null as unknown
+        for (let attempt = 0; attempt < 12; attempt += 1) {
           updateError = (
-            await supabase.from('maintenance_requests').update(withoutSnap).eq('id', requestId)
+            await supabase.from('maintenance_requests').update(patchForLegacySchema).eq('id', requestId)
           ).error
+          if (!updateError) break
+          const message = asErrorMessage(updateError)
+          if (!/column|schema cache|could not find|does not exist/i.test(message)) break
+          const missing = extractMissingColumnName(message)
+          if (!missing || !(missing in patchForLegacySchema)) break
+          delete patchForLegacySchema[missing]
         }
         if (updateError) throw updateError
 
@@ -336,6 +319,9 @@ export async function POST(request: NextRequest) {
         filename,
         recipient: targetEmail,
         stateUpdateError: stateUpdateError || undefined,
+        warning: stateUpdateError
+          ? `Report sent, but post-send status update failed: ${stateUpdateError}`
+          : undefined,
       })
     }
 

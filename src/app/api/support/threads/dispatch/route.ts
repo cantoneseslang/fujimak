@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import nodemailer from 'nodemailer'
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin'
+import { createSmtpTransport, resolveEffectiveSmtpConfig } from '@/lib/effectiveSmtpConfig'
 
 type SupportAttachment = {
   url: string
@@ -71,17 +71,9 @@ async function sendMechanicAssignmentEmail(params: {
   symptom: string
   preferredDate: string
 }) {
-  const smtpPass = asText(process.env.SMTP_PASS)
-  if (!smtpPass) return
-  const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.titan.email',
-    port: Number(process.env.SMTP_PORT || '465'),
-    secure: String(process.env.SMTP_SECURE || 'true') !== 'false',
-    auth: {
-      user: process.env.SMTP_USER || 'info@lifesupporthk.com',
-      pass: smtpPass,
-    },
-  })
+  const smtpConfig = await resolveEffectiveSmtpConfig()
+  if (!smtpConfig) return
+  const transporter = createSmtpTransport(smtpConfig)
   const subject = `New Mechanic Assignment (${params.storeName})`
   const text = [
     'You have a new assigned maintenance job.',
@@ -92,9 +84,7 @@ async function sendMechanicAssignmentEmail(params: {
     `Preferred Date: ${params.preferredDate}`,
   ].join('\n')
   await transporter.sendMail({
-    from:
-      process.env.SMTP_FROM ||
-      `"Fujimak Maintenance" <${process.env.SMTP_USER || 'info@lifesupporthk.com'}>`,
+    from: smtpConfig.from,
     to: params.to,
     subject,
     text,

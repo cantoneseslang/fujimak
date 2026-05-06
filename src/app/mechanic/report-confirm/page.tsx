@@ -225,7 +225,9 @@ export default function MechanicReportConfirmPage() {
   const [customerEmail, setCustomerEmail] = useState(initialEmail)
   const [isSavingPdf, setIsSavingPdf] = useState(false)
   const [isSending, setIsSending] = useState(false)
-  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'warning' | 'error'; message: string } | null>(
+    null
+  )
   const [operationMode, setOperationMode] = useState<'production' | 'demo'>('production')
   const [isModeConfirmOpen, setIsModeConfirmOpen] = useState(false)
   const [signatureDataUrl, setSignatureDataUrl] = useState('')
@@ -479,14 +481,16 @@ export default function MechanicReportConfirmPage() {
         error?: string
         recipient?: string
         stateUpdateError?: string
+        warning?: string
       }
       if (!response.ok || !json.success) {
         throw new Error(json.error || 'Failed to send report email')
       }
+      const warningMessage = json.warning || (json.stateUpdateError ? `Workflow update failed: ${json.stateUpdateError}` : '')
       setFeedback({
-        type: 'success',
-        message: json.stateUpdateError
-          ? `Report sent to ${json.recipient || customerEmail || 'customer'}, but workflow update failed: ${json.stateUpdateError}`
+        type: warningMessage ? 'warning' : 'success',
+        message: warningMessage
+          ? `Report sent to ${json.recipient || customerEmail || 'customer'}, but with warning: ${warningMessage}`
           : `Report sent to ${json.recipient || customerEmail || 'customer'}. Waiting for invoice issuance.`,
       })
       clearMechanicReportDraft()
@@ -1097,6 +1101,8 @@ export default function MechanicReportConfirmPage() {
             className={`mx-auto mt-4 w-full max-w-[220mm] rounded-lg px-3 py-2 text-sm ${
               feedback.type === 'success'
                 ? 'border border-emerald-200 bg-emerald-50 text-emerald-700'
+                : feedback.type === 'warning'
+                  ? 'border border-amber-200 bg-amber-50 text-amber-800'
                 : 'border border-red-200 bg-red-50 text-red-700'
             }`}
           >

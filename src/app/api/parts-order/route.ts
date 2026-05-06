@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import nodemailer from 'nodemailer'
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin'
 import { parsePartsOrderDraftFromBody } from '@/lib/partsOrderApi'
 import { readPartsImageDataUri } from '@/lib/partsImagePaths'
 import { buildPartsOrderPdf, formatCurrency } from '@/lib/partsOrderPdf'
 import { fetchNotificationRecipientEmails } from '@/lib/notificationEmailsCompat'
 import { calculateOrderTotals } from '@/lib/partsOrder'
+import { createSmtpTransport, resolveEffectiveSmtpConfig } from '@/lib/effectiveSmtpConfig'
 
 const recentOrders = new Map<string, number>()
 const ORDER_TTL_MS = 15_000
@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
     recentOrders.set(idempotencyKey, now)
 
     const recipients = await getRecipients()
-    const smtpPass = process.env.SMTP_PASS
+    const smtpConfig = await resolveEffectiveSmtpConfig()
 
     const { totalUnits, totalAmount } = calculateOrderTotals(draft.items)
     const nowText = new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })
@@ -160,25 +160,15 @@ export async function POST(request: NextRequest) {
 
     let emailSent = false
     let emailError = ''
-    if (!smtpPass) {
+    if (!smtpConfig) {
       emailError = 'Missing SMTP_PASS'
     } else if (recipients.length === 0) {
       emailError = 'No recipient email configured'
     } else {
       try {
-        const transporter = nodemailer.createTransport({
-          host: process.env.SMTP_HOST || 'smtp.titan.email',
-          port: Number(process.env.SMTP_PORT || '465'),
-          secure: String(process.env.SMTP_SECURE || 'true') !== 'false',
-          auth: {
-            user: process.env.SMTP_USER || 'info@lifesupporthk.com',
-            pass: smtpPass,
-          },
-        })
+        const transporter = createSmtpTransport(smtpConfig)
         await transporter.sendMail({
-          from:
-            process.env.SMTP_FROM ||
-            `"Fujimak Maintenance" <${process.env.SMTP_USER || 'info@lifesupporthk.com'}>`,
+          from: smtpConfig.from,
           to: recipients.join(', '),
           subject,
           text,

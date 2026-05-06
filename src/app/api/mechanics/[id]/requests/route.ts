@@ -30,6 +30,10 @@ const BOARD_REQUEST_COLUMNS = [
   'preferred_date',
 ].join(',')
 
+function uniqueNonEmpty(values: Array<string | null | undefined>) {
+  return Array.from(new Set(values.map((value) => asText(value)).filter(Boolean)))
+}
+
 export async function GET(_request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params
@@ -37,46 +41,48 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ id
     if (!mechanicId) {
       return NextResponse.json({ error: 'mechanic id is required' }, { status: 400 })
     }
-    /**
-     * Board intentionally shows a shared open queue for every mechanic.
-     * Single query keeps response time stable and avoids account-dependent delays.
-     */
+    /** Board intentionally shows shared vendor queue for all mechanics. */
     const supabase = getSupabaseAdmin()
+    const { data: mechanicRows } = await supabase
+      .from('mechanics')
+      .select('name,email')
+      .eq('is_active', true)
+      .limit(50)
+    const vendorCandidates = uniqueNonEmpty([
+      'mechanicA',
+      'mechanicB',
+      'mechanicC',
+      ...((Array.isArray(mechanicRows) ? mechanicRows : []).flatMap((row) => {
+        const rec = row as Record<string, unknown>
+        const name = asText(rec.name)
+        const emailPrefix = asText(rec.email).split('@')[0] || ''
+        return [name, emailPrefix]
+      })),
+    ])
+    if (vendorCandidates.length === 0) {
+      return NextResponse.json({ requests: [] })
+    }
+    const orClause = vendorCandidates
+      .map((value) => `vendor_name.ilike.%${value.replaceAll('%', '')}%`)
+      .join(',')
+
     const { data: sharedRows, error: sharedError } = await supabase
       .from('maintenance_requests')
       .select(BOARD_REQUEST_COLUMNS)
+      .or(orClause)
+      .in('status', ['in_progress', 'pending'])
       .order('updated_at', { ascending: false })
       .limit(200)
 
-    let rows = Array.isArray(sharedRows) ? sharedRows : []
-    const shouldFallbackToFullRow =
-      !!sharedError ||
-      rows.length === 0
-
-    if (shouldFallbackToFullRow) {
-      const { data: fallbackRows, error: fallbackError } = await supabase
-        .from('maintenance_requests')
-        .select('*')
-        .order('updated_at', { ascending: false })
-        .limit(200)
-      if (!fallbackError && Array.isArray(fallbackRows)) {
-        rows = fallbackRows
-      } else if (sharedError && fallbackError) {
-        const message = asErrorMessage(fallbackError)
-        if (/column|schema cache|could not find|relation|does not exist/i.test(message)) {
-          return NextResponse.json({ requests: [] })
-        }
-        throw fallbackError
-      } else if (sharedError) {
-        const message = asErrorMessage(sharedError)
-        if (/column|schema cache|could not find|relation|does not exist/i.test(message)) {
-          return NextResponse.json({ requests: [] })
-        }
-        throw sharedError
+    if (sharedError) {
+      const message = asErrorMessage(sharedError)
+      if (/column|schema cache|could not find|relation|does not exist/i.test(message)) {
+        return NextResponse.json({ requests: [] })
       }
+      throw sharedError
     }
 
-    return NextResponse.json({ requests: rows })
+    return NextResponse.json({ requests: Array.isArray(sharedRows) ? sharedRows : [] })
   } catch (error) {
     return NextResponse.json({ error: asErrorMessage(error) }, { status: 500 })
   }

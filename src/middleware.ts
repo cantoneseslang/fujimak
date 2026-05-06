@@ -5,7 +5,7 @@ import {
   ensureAccessForIdentifier,
   normalizeIdentifier,
 } from "@/lib/accessPolicy";
-import { locales, type Locale } from "@/i18n/config";
+import { locales, FUJIMAK_REQUEST_LOCALE_HEADER, type Locale } from "@/i18n/config";
 import { negotiateLocaleFromAcceptLanguage } from "@/i18n/negotiateLocale";
 
 const TEST_CODE_COOKIE = "fujimak_test_code";
@@ -69,7 +69,20 @@ async function withTimeout<T>(task: Promise<T>, ms: number) {
   }
 }
 
-/** 有効な locale Cookie が無いときだけ Accept-Language で決めて固定（以降は Cookie のみ）。 */
+function resolveLocaleFromRequest(request: NextRequest): Locale {
+  const raw = request.cookies.get("locale")?.value;
+  if (raw && locales.includes(raw as Locale)) return raw as Locale;
+  return negotiateLocaleFromAcceptLanguage(request.headers.get("accept-language"));
+}
+
+/** Same locale the middleware will persist on Set-Cookie — forwarded so RSC/next-intl agree on the same request. */
+function stampIncomingLocale(request: NextRequest): Headers {
+  const h = new Headers(request.headers);
+  h.set(FUJIMAK_REQUEST_LOCALE_HEADER, resolveLocaleFromRequest(request));
+  return h;
+}
+
+/** Persist locale cookie only when the browser did not send a valid one yet. */
 function ensureLocaleCookie(request: NextRequest, response: NextResponse) {
   const { pathname } = request.nextUrl;
   if (pathname.startsWith("/api")) return response;
@@ -77,16 +90,22 @@ function ensureLocaleCookie(request: NextRequest, response: NextResponse) {
   const raw = request.cookies.get("locale")?.value;
   if (raw && locales.includes(raw as Locale)) return response;
 
-  const negotiated = negotiateLocaleFromAcceptLanguage(
-    request.headers.get("accept-language"),
-  );
-  response.cookies.set("locale", negotiated, {
+  const resolved = resolveLocaleFromRequest(request);
+  response.cookies.set("locale", resolved, {
     path: "/",
     maxAge: LOCALE_COOKIE_MAX_AGE,
     httpOnly: false,
     sameSite: "lax",
   });
   return response;
+}
+
+function nextWithLocale(request: NextRequest): NextResponse {
+  return NextResponse.next({
+    request: {
+      headers: stampIncomingLocale(request),
+    },
+  });
 }
 
 export async function middleware(request: NextRequest) {
@@ -97,19 +116,19 @@ export async function middleware(request: NextRequest) {
   }
 
   if (pathname.startsWith("/auth")) {
-    return ensureLocaleCookie(request, NextResponse.next());
+    return ensureLocaleCookie(request, nextWithLocale(request));
   }
 
   if (!isProtectedPath(pathname)) {
-    return ensureLocaleCookie(request, NextResponse.next());
+    return ensureLocaleCookie(request, nextWithLocale(request));
   }
 
   if (isBackgroundNavigationRequest(request)) {
-    return ensureLocaleCookie(request, NextResponse.next());
+    return ensureLocaleCookie(request, nextWithLocale(request));
   }
 
   if (shouldBypassAuthInDev(request)) {
-    return ensureLocaleCookie(request, NextResponse.next());
+    return ensureLocaleCookie(request, nextWithLocale(request));
   }
 
   const url = env(process.env.NEXT_PUBLIC_FUJIMAK_SUPABASE_URL) || env(process.env.NEXT_PUBLIC_SUPABASE_URL);
@@ -131,7 +150,7 @@ export async function middleware(request: NextRequest) {
 
   const response = NextResponse.next({
     request: {
-      headers: request.headers,
+      headers: stampIncomingLocale(request),
     },
   });
 

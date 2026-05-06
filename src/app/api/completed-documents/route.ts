@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin'
 import {
   getArchiveBucketName,
+  tryDownloadArchivedPdf,
   maintenanceRequestArchivePath,
   maintenanceSignedArchivePath,
   maintenanceLegacyArchivePath,
@@ -83,6 +84,15 @@ export async function GET(request: NextRequest) {
     const query = asText(request.nextUrl.searchParams.get('q')).toLowerCase()
 
     const supabase = getSupabaseAdmin()
+    const archiveExistenceCache = new Map<string, boolean>()
+    const archivedPdfExists = async (path: string) => {
+      if (!path) return false
+      if (archiveExistenceCache.has(path)) return archiveExistenceCache.get(path) ?? false
+      const downloaded = await tryDownloadArchivedPdf({ supabase, objectPath: path })
+      const exists = !!downloaded
+      archiveExistenceCache.set(path, exists)
+      return exists
+    }
     const maintenanceResult = await supabase
       .from('maintenance_requests')
       .select('*')
@@ -113,9 +123,10 @@ export async function GET(request: NextRequest) {
       return hasInvoiceFile || hasIssuedAt
     })
 
-    const maintenanceDocs: CompletedDocumentRow[] = maintenanceRows.flatMap((row) => {
+    const maintenanceDocsNested = await Promise.all(
+      maintenanceRows.map(async (row) => {
       const requestId = asText(row.id)
-      if (!requestId) return []
+      if (!requestId) return [] as CompletedDocumentRow[]
       const storeId = asText(row.store_id)
       const storeName = asText(row.store_name)
       const title = toMaintenanceTitle(row)
@@ -140,8 +151,11 @@ export async function GET(request: NextRequest) {
       const invoiceFilename = asText(row.invoice_pdf_filename) || `invoice-${requestId}.pdf`
       const invoiceArchivePath =
         asNullableText(row.invoice_archive_path) ||
-        maintenanceInvoiceArchivePath(requestId, `invoice-${requestId}.pdf`) ||
-        maintenanceLegacyArchivePath(requestId, invoiceFilename)
+        maintenanceInvoiceArchivePath(requestId, `invoice-${requestId}.pdf`)
+      const invoiceLegacyArchivePath = maintenanceLegacyArchivePath(requestId, invoiceFilename)
+      const hasSignedArchive = await archivedPdfExists(signedArchivePath)
+      const hasInvoiceArchive =
+        (await archivedPdfExists(invoiceArchivePath)) || (await archivedPdfExists(invoiceLegacyArchivePath))
 
       const docs: CompletedDocumentRow[] = [
         {
@@ -164,7 +178,7 @@ export async function GET(request: NextRequest) {
         },
       ]
 
-      if (signedAt) {
+      if (signedAt || hasSignedArchive) {
         docs.push({
           id: `maintenance-signed:${requestId}`,
           kind: 'maintenance_signed',
@@ -174,7 +188,7 @@ export async function GET(request: NextRequest) {
           store_name: storeName,
           title,
           filename: signedFilename,
-          issued_at: signedAt,
+          issued_at: signedAt || updatedAt,
           completed_at: completedAt,
           updated_at: updatedAt,
           invoice_amount: null,
@@ -186,7 +200,7 @@ export async function GET(request: NextRequest) {
         })
       }
 
-      if (hasInvoice) {
+      if (hasInvoice || hasInvoiceArchive) {
         docs.push({
           id: `maintenance-invoice:${requestId}`,
           kind: 'maintenance_invoice',
@@ -196,18 +210,20 @@ export async function GET(request: NextRequest) {
           store_name: storeName,
           title,
           filename: invoiceFilename,
-          issued_at: asNullableText(row.invoice_issued_at),
+          issued_at: asNullableText(row.invoice_issued_at) || updatedAt,
           completed_at: completedAt,
           updated_at: updatedAt,
           invoice_amount: invoiceAmount,
           invoice_work_description: asNullableText(row.invoice_work_description),
           archive_bucket: asNullableText(row.invoice_archive_bucket) || getArchiveBucketName(),
-          archive_path: invoiceArchivePath,
+          archive_path: hasInvoiceArchive ? invoiceArchivePath : invoiceArchivePath,
         })
       }
 
       return docs
-    })
+      })
+    )
+    const maintenanceDocs: CompletedDocumentRow[] = maintenanceDocsNested.flat()
 
     const partsDocs: CompletedDocumentRow[] = partsRows.map((row) => {
       const workflowId = asText(row.id)

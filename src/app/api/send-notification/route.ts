@@ -154,7 +154,8 @@ export async function POST(request: NextRequest) {
         success: true,
         delivered: false,
         skipped: true,
-        message: 'Notification skipped: SMTP_PASS is not configured',
+        message:
+          'Notification skipped: no SMTP password. Set SMTP_PASS in Vercel (Production), or save Gmail App Password in Settings → SMTP Password and Save.',
       })
     }
 

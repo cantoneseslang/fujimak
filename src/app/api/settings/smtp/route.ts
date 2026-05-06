@@ -95,16 +95,25 @@ export async function PUT(request: NextRequest) {
   try {
     const body = await request.json()
     const raw = (body?.smtp ?? {}) as Record<string, unknown>
+
+    const supabase = getSupabaseAdmin()
+    const { data: existingRows, error: existingErr } = await supabase
+      .from('notification_settings')
+      .select('setting_key')
+      .like('setting_key', `${SMTP_SETTING_PREFIX}%`)
+    if (existingErr) throw existingErr
+    const previous = parseConfigFromRows((existingRows ?? []) as Array<{ setting_key?: unknown }>)
+
+    const incomingPass = sanitizeText(raw.pass)
     const smtp: SmtpConfig = {
       host: sanitizeText(raw.host),
       port: sanitizeText(raw.port),
       secure: raw.secure !== false,
       user: sanitizeText(raw.user),
-      pass: sanitizeText(raw.pass),
+      pass: incomingPass || previous.pass,
       from: sanitizeText(raw.from),
     }
 
-    const supabase = getSupabaseAdmin()
     const { error: deleteError } = await supabase
       .from('notification_settings')
       .delete()

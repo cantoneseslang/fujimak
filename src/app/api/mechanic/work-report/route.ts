@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import PDFDocument from 'pdfkit'
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin'
 import { createSmtpTransport, resolveEffectiveSmtpConfig } from '@/lib/effectiveSmtpConfig'
 import { explainSmtpFailure } from '@/lib/smtpExplainError'
@@ -69,6 +70,43 @@ function extractMissingColumnName(message: string) {
   const doubleQuoted = message.match(/column "([^"]+)"/)
   if (doubleQuoted?.[1]) return doubleQuoted[1]
   return ''
+}
+
+async function buildQuickSendPdf(params: {
+  reportNo: string
+  issuedAt: string
+  record: MaintenanceRequestRecord
+  maintenanceSummary: string
+}) {
+  const { reportNo, issuedAt, record, maintenanceSummary } = params
+  const doc = new PDFDocument({ size: 'A4', margin: 40, compress: true })
+  const chunks: Buffer[] = []
+  doc.on('data', (chunk) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)))
+  const done = new Promise<Buffer>((resolve, reject) => {
+    doc.on('end', () => resolve(Buffer.concat(chunks)))
+    doc.on('error', reject)
+  })
+
+  doc.font('Helvetica-Bold').fontSize(18).text('Maintenance Report', { align: 'center' })
+  doc.moveDown(0.8)
+  doc.font('Helvetica').fontSize(10)
+  doc.text(`Report No: ${reportNo}`)
+  doc.text(`Issued: ${issuedAt}`)
+  doc.text(`Request ID: ${record.id}`)
+  doc.text(`Store: ${asText(record.store_name) || asText(record.store_id) || '-'}`)
+  doc.text(`Machine: ${asText(record.machine_name) || asText(record.machine_model) || '-'}`)
+  doc.text(`Serial: ${asText(record.machine_serial) || '-'}`)
+  doc.text(`Fault Location: ${asText(record.fault_location) || '-'}`)
+  doc.text(`Symptom: ${asText(record.symptom) || '-'}`)
+  doc.moveDown(0.8)
+  doc.font('Helvetica-Bold').text('Summary')
+  doc.font('Helvetica').text(maintenanceSummary || '-', { width: 500 })
+  doc.moveDown(1.2)
+  doc.fontSize(9).fillColor('#555')
+  doc.text('Generated in send mode (lightweight PDF).')
+  doc.fillColor('#111')
+  doc.end()
+  return done
 }
 
 function buildDemoRecord(payload: DemoReportPayload): MaintenanceRequestRecord {
@@ -188,15 +226,24 @@ export async function POST(request: NextRequest) {
     )}`
     const mergedReportForm = buildMaintenanceReportFormState(record, maintenanceReportRaw)
 
+    const maintenanceSummary = [asText(mergedReportForm.concern), asText(mergedReportForm.actionTaken), asText(mergedReportForm.recommendation)]
+      .filter(Boolean)
+      .join('\n')
     const pdfBuffer = await withTimeout(
-      buildMechanicWorkReportPdf({
-        request: record,
-        reportNo,
-        issuedAtText: issuedAt,
-        signatureDataUrl,
-        maintenanceReport: mergedReportForm,
-        disableImages: shouldSend,
-      }),
+      shouldSend
+        ? buildQuickSendPdf({
+            reportNo,
+            issuedAt,
+            record,
+            maintenanceSummary,
+          })
+        : buildMechanicWorkReportPdf({
+            request: record,
+            reportNo,
+            issuedAtText: issuedAt,
+            signatureDataUrl,
+            maintenanceReport: mergedReportForm,
+          }),
       20000,
       'pdf_build'
     )

@@ -149,22 +149,31 @@ export default function SettingsPage() {
             login_code?: string | null
             is_active?: boolean
           }>
+          warning?: string
         }
         const rows = Array.isArray(json.mechanics) ? json.mechanics : []
+        const syntheticByWarning =
+          typeof json.warning === 'string' && json.warning.trim().length > 0
         if (rows.length > 0) {
           loadedMechanicsFromServer = true
           setMechanics(
-            rows.map((row) => ({
-              id: row.id,
-              name: (typeof row.english_name === 'string' && row.english_name.trim().length > 0
-                ? row.english_name
-                : row.name || ''
-              ).trim(),
-              email: (row.email || '').trim().toLowerCase(),
-              loginCode: typeof row.login_code === 'string' ? row.login_code : '',
-              is_active: row.is_active !== false,
-              isNew: false,
-            }))
+            rows.map((row) => {
+              const id = typeof row.id === 'string' ? row.id : ''
+              const isSyntheticRow =
+                syntheticByWarning || id.startsWith('fallback-mechanic-')
+              return {
+                id,
+                name: (
+                  typeof row.english_name === 'string' && row.english_name.trim().length > 0
+                    ? row.english_name
+                    : row.name || ''
+                ).trim(),
+                email: (row.email || '').trim().toLowerCase(),
+                loginCode: typeof row.login_code === 'string' ? row.login_code : '',
+                is_active: row.is_active !== false,
+                isNew: isSyntheticRow,
+              }
+            })
           )
         }
       } catch (error) {
@@ -518,10 +527,12 @@ export default function SettingsPage() {
         })
       }
     } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to save settings'
       setSaveFeedback({
         type: 'error',
-        message: error instanceof Error ? error.message : 'Failed to save settings',
+        message,
       })
+      alert(message)
     } finally {
       setIsSaving(false)
     }

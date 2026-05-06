@@ -61,6 +61,82 @@ function mechanicsTableUnavailableResponse(message: string) {
   )
 }
 
+/** Synthetic IDs from GET fallback must not be sent to `.eq('id', …)` (invalid uuid). */
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+}
+
+async function upsertMechanicFromBody(body: unknown): Promise<NextResponse> {
+  const englishName =
+    asText((body as { englishName?: unknown })?.englishName) ||
+    asText((body as { name?: unknown })?.name)
+  const sirName = asText((body as { sirName?: unknown })?.sirName) || null
+  const familyName = asText((body as { familyName?: unknown })?.familyName) || null
+  const phoneNumber = asText((body as { phoneNumber?: unknown })?.phoneNumber) || null
+  const email = (
+    asText((body as { emailAddress?: unknown })?.emailAddress) ||
+    asText((body as { email?: unknown })?.email)
+  ).toLowerCase()
+  const loginCode = asText((body as { loginCode?: unknown })?.loginCode) || null
+  const isActive =
+    typeof (body as { isActive?: unknown })?.isActive === 'boolean'
+      ? (body as { isActive: boolean }).isActive
+      : true
+  if (!englishName || !email) {
+    return NextResponse.json({ error: 'englishName and emailAddress are required' }, { status: 400 })
+  }
+  const supabase = getSupabaseAdmin()
+  const updatedAt = new Date().toISOString()
+  const insertRow = {
+    name: englishName,
+    english_name: englishName,
+    sir_name: sirName,
+    family_name: familyName,
+    phone_number: phoneNumber,
+    email,
+    login_code: loginCode,
+    is_active: isActive,
+    updated_at: updatedAt,
+  }
+  const { data, error } = await supabase
+    .from('mechanics')
+    .upsert(insertRow, { onConflict: 'email' })
+    .select('*')
+    .single()
+  if (error) {
+    const message = asErrorMessage(error)
+    if (isMechanicsTableUnavailableError(message)) {
+      return mechanicsTableUnavailableResponse(message)
+    }
+    if (!isMissingColumnError(message)) {
+      return NextResponse.json({ error: message }, { status: 500 })
+    }
+    const { data: fallbackData, error: fallbackError } = await supabase
+      .from('mechanics')
+      .upsert(
+        {
+          name: englishName,
+          email,
+          login_code: loginCode,
+          is_active: isActive,
+          updated_at: updatedAt,
+        },
+        { onConflict: 'email' }
+      )
+      .select('*')
+      .single()
+    if (fallbackError) {
+      const fbMsg = asErrorMessage(fallbackError)
+      if (isMechanicsTableUnavailableError(fbMsg)) {
+        return mechanicsTableUnavailableResponse(fbMsg)
+      }
+      return NextResponse.json({ error: fbMsg }, { status: 500 })
+    }
+    return NextResponse.json({ mechanic: fallbackData }, { status: 201 })
+  }
+  return NextResponse.json({ mechanic: data }, { status: 201 })
+}
+
 async function ensureDefaultMechanics() {
   const supabase = getSupabaseAdmin()
   for (const seed of DEFAULT_MECHANICS) {
@@ -148,57 +224,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const englishName = asText(body?.englishName) || asText(body?.name)
-    const sirName = asText(body?.sirName) || null
-    const familyName = asText(body?.familyName) || null
-    const phoneNumber = asText(body?.phoneNumber) || null
-    const email = (asText(body?.emailAddress) || asText(body?.email)).toLowerCase()
-    const loginCode = asText(body?.loginCode) || null
-    const isActive = typeof body?.isActive === 'boolean' ? body.isActive : true
-    if (!englishName || !email) {
-      return NextResponse.json({ error: 'englishName and emailAddress are required' }, { status: 400 })
-    }
-    const supabase = getSupabaseAdmin()
-    const insertRow = {
-      name: englishName,
-      english_name: englishName,
-      sir_name: sirName,
-      family_name: familyName,
-      phone_number: phoneNumber,
-      email,
-      login_code: loginCode,
-      is_active: isActive,
-    }
-    const { data, error } = await supabase
-      .from('mechanics')
-      .insert(insertRow)
-      .select('*')
-      .single()
-    if (error) {
-      const message = asErrorMessage(error)
-      if (isMechanicsTableUnavailableError(message)) {
-        return mechanicsTableUnavailableResponse(message)
-      }
-      if (!isMissingColumnError(message)) throw error
-      const { data: fallbackData, error: fallbackError } = await supabase
-        .from('mechanics')
-        .insert({
-          name: englishName,
-          email,
-          login_code: loginCode,
-        })
-        .select('*')
-        .single()
-      if (fallbackError) {
-        const fbMsg = asErrorMessage(fallbackError)
-        if (isMechanicsTableUnavailableError(fbMsg)) {
-          return mechanicsTableUnavailableResponse(fbMsg)
-        }
-        throw fallbackError
-      }
-      return NextResponse.json({ mechanic: fallbackData }, { status: 201 })
-    }
-    return NextResponse.json({ mechanic: data }, { status: 201 })
+    return await upsertMechanicFromBody(body)
   } catch (error) {
     const message = asErrorMessage(error)
     if (isMechanicsTableUnavailableError(message)) {
@@ -214,6 +240,9 @@ export async function PATCH(request: NextRequest) {
     const id = asText(body?.id)
     if (!id) {
       return NextResponse.json({ error: 'id is required' }, { status: 400 })
+    }
+    if (!isUuid(id)) {
+      return upsertMechanicFromBody(body)
     }
     const patch: Record<string, unknown> = {
       updated_at: new Date().toISOString(),

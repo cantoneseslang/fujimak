@@ -30,6 +30,10 @@ const BOARD_REQUEST_COLUMNS = [
   'preferred_date',
 ].join(',')
 
+function uniqueNonEmpty(values: Array<string | null | undefined>) {
+  return Array.from(new Set(values.map((value) => asText(value)).filter(Boolean)))
+}
+
 export async function GET(_request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params
@@ -39,11 +43,28 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ id
     }
     /** Board intentionally shows shared vendor queue for all mechanics. */
     const supabase = getSupabaseAdmin()
-    const orClause = [
-      'vendor_name.ilike.%mechanicA%',
-      'vendor_name.ilike.%mechanicB%',
-      'vendor_name.ilike.%mechanicC%',
-    ].join(',')
+    const { data: mechanicRows } = await supabase
+      .from('mechanics')
+      .select('name,email')
+      .eq('is_active', true)
+      .limit(50)
+    const vendorCandidates = uniqueNonEmpty([
+      'mechanicA',
+      'mechanicB',
+      'mechanicC',
+      ...((Array.isArray(mechanicRows) ? mechanicRows : []).flatMap((row) => {
+        const rec = row as Record<string, unknown>
+        const name = asText(rec.name)
+        const emailPrefix = asText(rec.email).split('@')[0] || ''
+        return [name, emailPrefix]
+      })),
+    ])
+    if (vendorCandidates.length === 0) {
+      return NextResponse.json({ requests: [] })
+    }
+    const orClause = vendorCandidates
+      .map((value) => `vendor_name.ilike.%${value.replaceAll('%', '')}%`)
+      .join(',')
     const { data: sharedRows, error: sharedError } = await supabase
       .from('maintenance_requests')
       .select(BOARD_REQUEST_COLUMNS)

@@ -34,6 +34,7 @@ type MechanicNotification = {
 }
 
 const MECHANIC_PROFILE_KEY = 'mechanic-board-profile-v1'
+const REQUESTS_CACHE_KEY = 'mechanic-board-requests-cache-v1'
 
 function asText(value: unknown) {
   return typeof value === 'string' ? value.trim() : ''
@@ -51,6 +52,7 @@ export default function MechanicBoardPage() {
   const [notifications, setNotifications] = useState<MechanicNotification[]>([])
   const [loadingBoard, setLoadingBoard] = useState(false)
   const didRestoreMechanicFromStorage = useRef(false)
+  const didAutoLoadBoard = useRef(false)
 
   const selectedMechanic = useMemo(
     () => mechanics.find((mechanic) => mechanic.id === selectedMechanicId) ?? null,
@@ -73,8 +75,6 @@ export default function MechanicBoardPage() {
   const loadBoard = useCallback(async (mechanicId: string) => {
     if (!mechanicId) return
     setLoadingBoard(true)
-    setRequests([])
-    setNotifications([])
     try {
       const [requestsRes, notificationsRes] = await Promise.all([
         fetch(`/api/mechanics/${encodeURIComponent(mechanicId)}/requests`, { cache: 'no-store' }),
@@ -87,10 +87,11 @@ export default function MechanicBoardPage() {
       }
       if (!requestsRes.ok) throw new Error(requestsJson.error || 'Failed to load assigned requests')
       if (!notificationsRes.ok) throw new Error(notificationsJson.error || 'Failed to load notifications')
-      setRequests(Array.isArray(requestsJson.requests) ? requestsJson.requests : [])
+      const nextRequests = Array.isArray(requestsJson.requests) ? requestsJson.requests : []
+      setRequests(nextRequests)
+      localStorage.setItem(REQUESTS_CACHE_KEY, JSON.stringify(nextRequests))
       setNotifications(Array.isArray(notificationsJson.notifications) ? notificationsJson.notifications : [])
     } catch (error) {
-      setRequests([])
       setNotifications([])
       setLoginError(error instanceof Error ? error.message : 'Failed to load board')
     } finally {
@@ -132,7 +133,21 @@ export default function MechanicBoardPage() {
   }, [mechanics, selectedMechanicId])
 
   useEffect(() => {
-    if (!selectedMechanicId) return
+    const raw = localStorage.getItem(REQUESTS_CACHE_KEY)
+    if (!raw) return
+    try {
+      const parsed = JSON.parse(raw) as unknown
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        setRequests(parsed as MaintenanceRequest[])
+      }
+    } catch {
+      localStorage.removeItem(REQUESTS_CACHE_KEY)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!selectedMechanicId || didAutoLoadBoard.current) return
+    didAutoLoadBoard.current = true
     void loadBoard(selectedMechanicId)
   }, [loadBoard, selectedMechanicId])
 

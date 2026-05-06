@@ -25,9 +25,11 @@ type CompletedDocument = {
 function folderPathFromDoc(doc: CompletedDocument) {
   const raw = (doc.archive_path || '').trim().replace(/^\/+/, '')
   if (!raw) return `fallback/${doc.kind}`
-  const idx = raw.lastIndexOf('/')
-  if (idx <= 0) return raw
-  return raw.slice(0, idx)
+  const segments = raw.split('/').filter(Boolean)
+  if (segments.length >= 2) {
+    return `${segments[0]}/${segments[1]}`
+  }
+  return raw
 }
 
 function kindLabel(kind: CompletedDocument['kind']) {
@@ -108,8 +110,19 @@ export default function ManagementDocsPage() {
       if (!map.has(folder)) map.set(folder, [])
       map.get(folder)?.push(doc)
     }
+    const folderOrder = new Map<string, number>([
+      ['maintenance/requests', 1],
+      ['maintenance/signed', 2],
+      ['maintenance/invoices', 3],
+      ['parts/invoices', 4],
+    ])
     return [...map.entries()]
-      .sort((a, b) => a[0].localeCompare(b[0]))
+      .sort((a, b) => {
+        const aRank = folderOrder.get(a[0]) ?? 999
+        const bRank = folderOrder.get(b[0]) ?? 999
+        if (aRank !== bRank) return aRank - bRank
+        return a[0].localeCompare(b[0])
+      })
       .map(([folder, docs]) => ({ folder, docs }))
   }, [filteredDocuments])
 

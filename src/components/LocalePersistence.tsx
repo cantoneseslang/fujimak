@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect } from 'react'
 import {
   FUJIMAK_LOCALE_STORAGE_KEY,
   locales,
@@ -20,35 +20,50 @@ function readCookieLocale(): Locale | null {
   }
 }
 
+function persistCookieToStorage(cookieLoc: Locale) {
+  localStorage.setItem(FUJIMAK_LOCALE_STORAGE_KEY, cookieLoc)
+  sessionStorage.removeItem(SESSION_RECOVER_KEY)
+}
+
 /**
- * Keeps localStorage in sync with the locale cookie; if the cookie disappears but we have a stored choice,
- * one redirect per tab session restores /api/locale (avoids silent fallback to defaultLocale).
+ * Cookie→localStorage の同期。Cookie が初描画でまだ見えないことがあるため短い遅延後に再チェックし、
+ * それでも無いときだけ（タブにつき一度）localStorage から /api/locale で復旧する。
  */
 export default function LocalePersistence() {
-  const ran = useRef(false)
-
   useEffect(() => {
-    if (ran.current) return
-    ran.current = true
+    let cancelled = false
 
-    const cookieLoc = readCookieLocale()
-    if (cookieLoc) {
-      localStorage.setItem(FUJIMAK_LOCALE_STORAGE_KEY, cookieLoc)
-      sessionStorage.removeItem(SESSION_RECOVER_KEY)
-      return
+    const tryRecoverFromStorage = () => {
+      const raw = localStorage.getItem(FUJIMAK_LOCALE_STORAGE_KEY)
+      const storedOk = raw && locales.includes(raw as Locale) ? (raw as Locale) : null
+      if (!storedOk) return
+
+      if (sessionStorage.getItem(SESSION_RECOVER_KEY)) return
+      sessionStorage.setItem(SESSION_RECOVER_KEY, '1')
+
+      const redirectTo = `${window.location.pathname}${window.location.search}`
+      window.location.replace(
+        `/api/locale?locale=${encodeURIComponent(storedOk)}&redirect=${encodeURIComponent(redirectTo)}`
+      )
     }
 
-    const raw = localStorage.getItem(FUJIMAK_LOCALE_STORAGE_KEY)
-    const storedOk = raw && locales.includes(raw as Locale) ? (raw as Locale) : null
-    if (!storedOk) return
+    const tick = (allowRecover: boolean) => {
+      if (cancelled) return
+      const cookieLoc = readCookieLocale()
+      if (cookieLoc) {
+        persistCookieToStorage(cookieLoc)
+        return
+      }
+      if (allowRecover) tryRecoverFromStorage()
+    }
 
-    if (sessionStorage.getItem(SESSION_RECOVER_KEY)) return
-    sessionStorage.setItem(SESSION_RECOVER_KEY, '1')
+    tick(false)
+    const id = window.setTimeout(() => tick(true), 280)
 
-    const redirectTo = `${window.location.pathname}${window.location.search}`
-    window.location.replace(
-      `/api/locale?locale=${encodeURIComponent(storedOk)}&redirect=${encodeURIComponent(redirectTo)}`
-    )
+    return () => {
+      cancelled = true
+      window.clearTimeout(id)
+    }
   }, [])
 
   return null

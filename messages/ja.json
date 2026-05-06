@@ -407,7 +407,9 @@
     "smtpTestTechnicalSummary": "技術的な詳細（サーバーからの生メッセージ）",
     "smtpTestUnknownTitle": "エラー",
     "smtpTestUnknownSummary": "サーバーからの応答を正しく解釈できませんでした。",
-    "smtpTestSuccessFallback": "テスト送信に成功しました。"
+    "smtpTestSuccessFallback": "テスト送信に成功しました。",
+    "smtpTestMissingCredentialsTitle": "SMTP Host または SMTP User が必要です",
+    "smtpTestMissingCredentialsSummary": "画面上は入力済みに見えても、ブラウザの自動入力だけではフォームの状態が更新されないことがあります。Host と User の欄を一度タップするか、1文字入力して消すなどしてから「送信テスト」を押してください。"
   },
   "areas": {
     "all-area": "全域",

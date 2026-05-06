@@ -407,7 +407,9 @@
     "smtpTestTechnicalSummary": "Technical detail (mensahe galing server)",
     "smtpTestUnknownTitle": "Error",
     "smtpTestUnknownSummary": "Hindi ma-parse ang tugon ng server.",
-    "smtpTestSuccessFallback": "Matagumpay na napadala ang test email."
+    "smtpTestSuccessFallback": "Matagumpay na napadala ang test email.",
+    "smtpTestMissingCredentialsTitle": "Kailangan ang SMTP host at user",
+    "smtpTestMissingCredentialsSummary": "Kung mukhang napunan pero hindi gumagana, maaaring ang browser autofill ay hindi na-sync sa form. I-tap ang Host at User field minsan, o mag-type ng isang character at burahin, pagkatapos subukan ulit ang Send test."
   },
   "areas": {
     "all-area": "Lahat ng Lugar",

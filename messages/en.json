@@ -407,7 +407,9 @@
     "smtpTestTechnicalSummary": "Technical detail (raw server message)",
     "smtpTestUnknownTitle": "Error",
     "smtpTestUnknownSummary": "Could not parse the server response.",
-    "smtpTestSuccessFallback": "Test email sent successfully."
+    "smtpTestSuccessFallback": "Test email sent successfully.",
+    "smtpTestMissingCredentialsTitle": "SMTP host or user required",
+    "smtpTestMissingCredentialsSummary": "If fields look filled but the test still fails, your browser may have autofilled the inputs without updating the form—tap inside Host and User once, or type a character and delete it. Then try Send test again."
   },
   "areas": {
     "all-area": "All Areas",

@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState, useEffect, useRef } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import { Globe, LogOut, Mail, Plus, Trash2, Save, Send } from 'lucide-react'
 import Header from '@/components/Header'
@@ -67,6 +67,11 @@ export default function SettingsPage() {
   const [smtpTestTo, setSmtpTestTo] = useState('')
   const [isSmtpTesting, setIsSmtpTesting] = useState(false)
   const [smtpTestFeedback, setSmtpTestFeedback] = useState<SmtpTestFeedback | null>(null)
+  const smtpHostRef = useRef<HTMLInputElement>(null)
+  const smtpPortRef = useRef<HTMLInputElement>(null)
+  const smtpUserRef = useRef<HTMLInputElement>(null)
+  const smtpPassRef = useRef<HTMLInputElement>(null)
+  const smtpFromRef = useRef<HTMLInputElement>(null)
   const t = useTranslations('settings')
   const nextIntlLocale = useLocale()
   const uiLocale: Locale = locales.includes(nextIntlLocale as Locale)
@@ -409,6 +414,27 @@ export default function SettingsPage() {
 
   const runSmtpTest = async () => {
     setSmtpTestFeedback(null)
+    const merged: SmtpSettings = {
+      host: smtpHostRef.current?.value.trim() || smtpSettings.host.trim(),
+      port: smtpPortRef.current?.value.trim() || smtpSettings.port.trim() || '465',
+      secure: smtpSettings.secure,
+      user: smtpUserRef.current?.value.trim() || smtpSettings.user.trim(),
+      pass: smtpPassRef.current?.value.trim() || smtpSettings.pass.trim(),
+      from: smtpFromRef.current?.value.trim() || smtpSettings.from.trim(),
+    }
+    if (!merged.host || !merged.user) {
+      setSmtpTestFeedback({
+        type: 'error',
+        explanation: {
+          title: t('smtpTestMissingCredentialsTitle'),
+          summary: t('smtpTestMissingCredentialsSummary'),
+          actions: [],
+          technical: '',
+        },
+      })
+      return
+    }
+    setSmtpSettings((prev) => ({ ...prev, ...merged }))
     setIsSmtpTesting(true)
     try {
       const res = await fetch('/api/settings/smtp/test', {
@@ -416,12 +442,12 @@ export default function SettingsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           smtp: {
-            host: smtpSettings.host.trim(),
-            port: smtpSettings.port.trim() || '465',
-            secure: smtpSettings.secure !== false,
-            user: smtpSettings.user.trim(),
-            pass: smtpSettings.pass.trim(),
-            from: smtpSettings.from.trim(),
+            host: merged.host.trim(),
+            port: merged.port.trim() || '465',
+            secure: merged.secure !== false,
+            user: merged.user.trim(),
+            pass: merged.pass.trim(),
+            from: merged.from.trim(),
           },
           mergeSavedPassword: true,
           testTo: smtpTestTo.trim() || undefined,
@@ -957,9 +983,12 @@ export default function SettingsPage() {
             <div>
               <label className="block text-sm font-medium text-gray-600">SMTP Host</label>
               <input
+                ref={smtpHostRef}
                 type="text"
                 value={smtpSettings.host}
                 onChange={(e) => updateSmtpSetting('host', e.target.value)}
+                onInput={(e) => updateSmtpSetting('host', (e.target as HTMLInputElement).value)}
+                autoComplete="off"
                 className="w-full mt-2 px-4 py-4 bg-white border border-gray-200 rounded-lg text-base focus:ring-2 focus:ring-zinc-900 focus:border-transparent"
                 placeholder="smtp.gmail.com"
               />
@@ -967,9 +996,12 @@ export default function SettingsPage() {
             <div>
               <label className="block text-sm font-medium text-gray-600">SMTP Port</label>
               <input
+                ref={smtpPortRef}
                 type="text"
                 value={smtpSettings.port}
                 onChange={(e) => updateSmtpSetting('port', e.target.value)}
+                onInput={(e) => updateSmtpSetting('port', (e.target as HTMLInputElement).value)}
+                autoComplete="off"
                 className="w-full mt-2 px-4 py-4 bg-white border border-gray-200 rounded-lg text-base focus:ring-2 focus:ring-zinc-900 focus:border-transparent"
                 placeholder="465"
               />
@@ -989,9 +1021,12 @@ export default function SettingsPage() {
             <div>
               <label className="block text-sm font-medium text-gray-600">SMTP User</label>
               <input
+                ref={smtpUserRef}
                 type="text"
                 value={smtpSettings.user}
                 onChange={(e) => updateSmtpSetting('user', e.target.value)}
+                onInput={(e) => updateSmtpSetting('user', (e.target as HTMLInputElement).value)}
+                autoComplete="username"
                 className="w-full mt-2 px-4 py-4 bg-white border border-gray-200 rounded-lg text-base focus:ring-2 focus:ring-zinc-900 focus:border-transparent"
                 placeholder="youraccount@gmail.com"
               />
@@ -999,9 +1034,12 @@ export default function SettingsPage() {
             <div>
               <label className="block text-sm font-medium text-gray-600">SMTP Password</label>
               <input
+                ref={smtpPassRef}
                 type="password"
                 value={smtpSettings.pass}
                 onChange={(e) => updateSmtpSetting('pass', e.target.value)}
+                onInput={(e) => updateSmtpSetting('pass', (e.target as HTMLInputElement).value)}
+                autoComplete="current-password"
                 className="w-full mt-2 px-4 py-4 bg-white border border-gray-200 rounded-lg text-base focus:ring-2 focus:ring-zinc-900 focus:border-transparent"
                 placeholder=""
               />
@@ -1009,9 +1047,12 @@ export default function SettingsPage() {
             <div>
               <label className="block text-sm font-medium text-gray-600">From Address</label>
               <input
+                ref={smtpFromRef}
                 type="text"
                 value={smtpSettings.from}
                 onChange={(e) => updateSmtpSetting('from', e.target.value)}
+                onInput={(e) => updateSmtpSetting('from', (e.target as HTMLInputElement).value)}
+                autoComplete="off"
                 className="w-full mt-2 px-4 py-4 bg-white border border-gray-200 rounded-lg text-base focus:ring-2 focus:ring-zinc-900 focus:border-transparent"
                 placeholder="Fujimak Maintenance <youraccount@gmail.com>"
               />
@@ -1058,9 +1099,7 @@ export default function SettingsPage() {
               isSmtpTesting ||
               isSaving ||
               hasDuplicateVendorEmails ||
-              hasDuplicateMechanicEmails ||
-              !smtpSettings.host.trim() ||
-              !smtpSettings.user.trim()
+              hasDuplicateMechanicEmails
             }
             className="flex flex-1 min-h-[52px] items-center justify-center gap-2 rounded-xl border-2 border-zinc-900 bg-white py-4 text-lg font-medium text-zinc-900 disabled:opacity-50"
           >

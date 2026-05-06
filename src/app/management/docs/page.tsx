@@ -20,6 +20,20 @@ type CompletedDocument = {
   invoice_work_description: string | null
 }
 
+const FOLDER_ORDER: Array<CompletedDocument['kind']> = [
+  'maintenance_request',
+  'maintenance_signed',
+  'maintenance_invoice',
+  'parts_invoice',
+]
+
+const FOLDER_LABEL: Record<CompletedDocument['kind'], string> = {
+  maintenance_request: 'Maintenance Request',
+  maintenance_signed: 'Client Signed Report',
+  maintenance_invoice: 'Maintenance Invoice',
+  parts_invoice: 'Parts Invoice',
+}
+
 export default function ManagementDocsPage() {
   const [documents, setDocuments] = useState<CompletedDocument[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -82,6 +96,19 @@ export default function ManagementDocsPage() {
     const signedCount = documents.filter((doc) => doc.kind === 'maintenance_signed').length
     return { invoiceCount, requestCount, signedCount }
   }, [documents])
+
+  const groupedDocuments = useMemo(() => {
+    const map = new Map<CompletedDocument['kind'], CompletedDocument[]>()
+    for (const kind of FOLDER_ORDER) map.set(kind, [])
+    for (const doc of filteredDocuments) {
+      map.get(doc.kind)?.push(doc)
+    }
+    return FOLDER_ORDER.map((kind) => ({
+      kind,
+      label: FOLDER_LABEL[kind],
+      docs: map.get(kind) ?? [],
+    }))
+  }, [filteredDocuments])
 
   const getDocumentPreviewUrl = useCallback((doc: CompletedDocument) => {
     const identifier = doc.request_id || doc.workflow_id || ''
@@ -211,76 +238,82 @@ export default function ManagementDocsPage() {
           ) : null}
 
           {!error && !isLoading && filteredDocuments.length > 0 ? (
-            <ul className="divide-y divide-gray-100">
-              {filteredDocuments.map((doc) => {
-                const identifier = doc.request_id || doc.workflow_id || '-'
-                const issuedAt = doc.issued_at || doc.completed_at || doc.updated_at
-                const previewUrl = getDocumentPreviewUrl(doc)
-                return (
-                  <li key={doc.id} className="px-3 py-2.5">
-                    <div className="flex items-start gap-3">
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold text-gray-800">
-                          {doc.store_name || doc.store_id || '-'} · {doc.title}
-                        </p>
-                        <p className="mt-0.5 truncate text-xs text-gray-500">
-                          {doc.kind === 'maintenance_invoice'
-                            ? 'Maintenance Invoice'
-                            : doc.kind === 'maintenance_request'
-                              ? 'Maintenance Request'
-                              : doc.kind === 'maintenance_signed'
-                                ? 'Client Signed Report'
-                              : 'Parts Invoice'}{' '}
-                          · {identifier}
-                        </p>
-                        <p className="mt-0.5 truncate text-xs text-gray-500">File: {doc.filename}</p>
-                        <p className="mt-0.5 text-xs text-gray-500">
-                          Issued: {issuedAt ? new Date(issuedAt).toLocaleString() : '-'}
-                        </p>
-                        {doc.invoice_amount ? (
-                          <p className="mt-0.5 text-xs text-gray-600">
-                            Amount: PHP {doc.invoice_amount.toLocaleString('en-US', { maximumFractionDigits: 2 })}
-                          </p>
-                        ) : null}
-                      </div>
+            <div className="divide-y divide-gray-100">
+              {groupedDocuments.map((group) => (
+                <section key={group.kind} className="px-3 py-2.5">
+                  <div className="mb-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-700">
+                    {`docs/${group.label} (${group.docs.length})`}
+                  </div>
+                  {group.docs.length === 0 ? (
+                    <p className="px-1 py-1 text-xs text-gray-400">No files in this folder.</p>
+                  ) : (
+                    <ul className="divide-y divide-gray-100 rounded-md border border-gray-100 bg-white">
+                      {group.docs.map((doc) => {
+                        const identifier = doc.request_id || doc.workflow_id || '-'
+                        const issuedAt = doc.issued_at || doc.completed_at || doc.updated_at
+                        const previewUrl = getDocumentPreviewUrl(doc)
+                        return (
+                          <li key={doc.id} className="px-2 py-2.5">
+                            <div className="flex items-start gap-3">
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-sm font-semibold text-gray-800">
+                                  {doc.store_name || doc.store_id || '-'} · {doc.title}
+                                </p>
+                                <p className="mt-0.5 truncate text-xs text-gray-500">
+                                  {group.label} · {identifier}
+                                </p>
+                                <p className="mt-0.5 truncate text-xs text-gray-500">File: {doc.filename}</p>
+                                <p className="mt-0.5 text-xs text-gray-500">
+                                  Issued: {issuedAt ? new Date(issuedAt).toLocaleString() : '-'}
+                                </p>
+                                {doc.invoice_amount ? (
+                                  <p className="mt-0.5 text-xs text-gray-600">
+                                    Amount: PHP {doc.invoice_amount.toLocaleString('en-US', { maximumFractionDigits: 2 })}
+                                  </p>
+                                ) : null}
+                              </div>
 
-                      <div className="flex shrink-0 items-center gap-2">
-                        <a
-                          href={previewUrl || undefined}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="block overflow-hidden rounded-md border border-gray-200 bg-white"
-                          style={{ width: '72px', height: '102px' }}
-                        >
-                          {previewUrl ? (
-                            <iframe
-                              title={`pdf-preview-${doc.id}`}
-                              src={`${previewUrl}#page=1&toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
-                              className="h-full w-full"
-                              loading="lazy"
-                            />
-                          ) : (
-                            <div className="h-full w-full flex items-center justify-center text-[10px] text-gray-500">
-                              No PDF
+                              <div className="flex shrink-0 items-center gap-2">
+                                <a
+                                  href={previewUrl || undefined}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="block overflow-hidden rounded-md border border-gray-200 bg-white"
+                                  style={{ width: '72px', height: '102px' }}
+                                >
+                                  {previewUrl ? (
+                                    <iframe
+                                      title={`pdf-preview-${doc.id}`}
+                                      src={`${previewUrl}#page=1&toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
+                                      className="h-full w-full"
+                                      loading="lazy"
+                                    />
+                                  ) : (
+                                    <div className="h-full w-full flex items-center justify-center text-[10px] text-gray-500">
+                                      No PDF
+                                    </div>
+                                  )}
+                                </a>
+                                <button
+                                  type="button"
+                                  onClick={() => void handleDownload(doc)}
+                                  disabled={downloadingDocumentId === doc.id || !previewUrl}
+                                  className="inline-flex items-center gap-1 rounded-md bg-zinc-900 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
+                                  style={{ minWidth: '124px', minHeight: '36px' }}
+                                >
+                                  <Download className="h-3 w-3" />
+                                  {downloadingDocumentId === doc.id ? 'Downloading...' : 'Download PDF'}
+                                </button>
+                              </div>
                             </div>
-                          )}
-                        </a>
-                        <button
-                          type="button"
-                          onClick={() => void handleDownload(doc)}
-                          disabled={downloadingDocumentId === doc.id || !previewUrl}
-                          className="inline-flex items-center gap-1 rounded-md bg-zinc-900 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
-                          style={{ minWidth: '124px', minHeight: '36px' }}
-                        >
-                          <Download className="h-3 w-3" />
-                          {downloadingDocumentId === doc.id ? 'Downloading...' : 'Download PDF'}
-                        </button>
-                      </div>
-                    </div>
-                  </li>
-                )
-              })}
-            </ul>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  )}
+                </section>
+              ))}
+            </div>
           ) : null}
 
           {actionMessage ? (

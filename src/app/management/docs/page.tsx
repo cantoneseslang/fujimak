@@ -43,6 +43,9 @@ export default function ManagementDocsPage() {
   const [search, setSearch] = useState('')
   const [actionMessage, setActionMessage] = useState<string | null>(null)
   const [isBackfilling, setIsBackfilling] = useState(false)
+  const [openFolders, setOpenFolders] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(MAINTENANCE_FOLDERS.map(({ folder }) => [folder, false]))
+  )
 
   const loadDocuments = useCallback(async () => {
     setIsLoading(true)
@@ -195,18 +198,42 @@ export default function ManagementDocsPage() {
           ) : null}
           {!error && !isLoading ? (
             <div className="divide-y divide-gray-100 px-3 py-2">
-              {groupedDocuments.map((group) => (
-                <details key={group.folder} className="group border-b border-gray-100 py-2 last:border-b-0">
-                  <summary className="flex cursor-pointer list-none items-center gap-2 rounded-md px-2 py-2 text-sm font-semibold text-gray-800 marker:hidden [&::-webkit-details-marker]:hidden">
-                    <ChevronRight className="h-4 w-4 shrink-0 text-gray-500 transition-transform group-open:rotate-90" aria-hidden />
-                    <span className="min-w-0 flex-1 truncate">{group.heading}</span>
-                    <span className="shrink-0 tabular-nums text-xs font-normal text-gray-500">({group.docs.length})</span>
-                  </summary>
-                  {group.docs.length === 0 ? (
-                    <p className="px-2 pb-2 pl-8 text-xs text-gray-500">No files in this folder.</p>
-                  ) : null}
-                </details>
-              ))}
+              {groupedDocuments.map((group) => {
+                const isOpen = openFolders[group.folder] === true
+                const panelId = `docs-folder-${group.folder.replace(/\//g, '-')}`
+                return (
+                  <section key={group.folder} className="border-b border-gray-100 py-2 last:border-b-0">
+                    <button
+                      type="button"
+                      id={`${panelId}-trigger`}
+                      aria-expanded={isOpen}
+                      aria-controls={panelId}
+                      onClick={() =>
+                        setOpenFolders((prev) => ({
+                          ...prev,
+                          [group.folder]: !prev[group.folder],
+                        }))
+                      }
+                      className="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-left text-sm font-semibold text-gray-800"
+                    >
+                      <ChevronRight
+                        className={`h-4 w-4 shrink-0 text-gray-500 transition-transform ${isOpen ? 'rotate-90' : ''}`}
+                        aria-hidden
+                      />
+                      <span className="min-w-0 flex-1 truncate text-sm font-semibold text-gray-800">
+                        {`${group.heading}(${group.docs.length})`}
+                      </span>
+                    </button>
+                    {isOpen ? (
+                      <div id={panelId} role="region" aria-labelledby={`${panelId}-trigger`} className="px-2 pb-2 pl-8">
+                        {group.docs.length === 0 ? (
+                          <p className="text-xs text-gray-500">No files in this folder.</p>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </section>
+                )
+              })}
             </div>
           ) : null}
 

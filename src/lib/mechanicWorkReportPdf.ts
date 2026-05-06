@@ -48,19 +48,25 @@ async function imageBufferFromUrl(url: string): Promise<Buffer | null> {
   const dataMatch = trimmed.match(/^data:image\/[\w+.-]+;base64,(.+)$/i)
   if (dataMatch?.[1]) {
     try {
-      return Buffer.from(dataMatch[1], 'base64')
+      const buf = Buffer.from(dataMatch[1], 'base64')
+      /** PDFKit image parser is safest with valid PNG/JPEG only. */
+      return imageDimensionsFromBuffer(buf) ? buf : null
     } catch {
       return null
     }
   }
 
   try {
-    const res = await fetch(trimmed)
+    const res = await fetch(trimmed, {
+      signal: AbortSignal.timeout(7000),
+      headers: { 'accept-encoding': 'identity' },
+    })
     if (!res.ok) return null
     const contentType = asText(res.headers.get('content-type'))
-    if (!contentType.startsWith('image/')) return null
+    if (!(contentType.startsWith('image/png') || contentType.startsWith('image/jpeg'))) return null
     const ab = await res.arrayBuffer()
-    return Buffer.from(ab)
+    const buf = Buffer.from(ab)
+    return imageDimensionsFromBuffer(buf) ? buf : null
   } catch {
     return null
   }
@@ -93,7 +99,7 @@ function imageDimensionsFromBuffer(buf: Buffer): { width: number; height: number
         i++
         continue
       }
-      let marker = buf[i + 1]
+      const marker = buf[i + 1]
       if (marker === 0xd9) break
       if (marker === 0xd8 || (marker >= 0xd0 && marker <= 0xd7) || marker === 0x01) {
         i += 2

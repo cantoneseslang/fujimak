@@ -9,6 +9,14 @@ import { locales, defaultLocale, FUJIMAK_REQUEST_LOCALE_HEADER, type Locale } fr
 
 const TEST_CODE_COOKIE = "fujimak_test_code";
 const LOCALE_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
+
+const localeCookieSetOptions = {
+  path: "/" as const,
+  maxAge: LOCALE_COOKIE_MAX_AGE,
+  httpOnly: false,
+  sameSite: "lax" as const,
+  ...(process.env.NODE_ENV === "production" ? { secure: true as const } : {}),
+};
 const env = (value: string | undefined) => (typeof value === "string" ? value.trim() : "");
 const AUTH_CHECK_TIMEOUT_MS = 2500;
 
@@ -91,12 +99,7 @@ function ensureLocaleCookie(request: NextRequest, response: NextResponse) {
   if (raw && locales.includes(raw as Locale)) return response;
 
   const resolved = resolveLocaleFromRequest(request);
-  response.cookies.set("locale", resolved, {
-    path: "/",
-    maxAge: LOCALE_COOKIE_MAX_AGE,
-    httpOnly: false,
-    sameSite: "lax",
-  });
+  response.cookies.set("locale", resolved, localeCookieSetOptions);
   return response;
 }
 

@@ -6,14 +6,15 @@ import { locales, localeNames, type Locale } from '@/i18n/config'
 
 interface LanguageSwitcherProps {
   currentLocale: Locale
-  onLocaleChange: (locale: Locale) => void
+  /** Full reload follows via /api/locale — optional hook only */
+  onLocaleChange?: (locale: Locale) => void
 }
 
 export default function LanguageSwitcher({ currentLocale, onLocaleChange }: LanguageSwitcherProps) {
   const [isOpen, setIsOpen] = useState(false)
 
   const handleSelect = (locale: Locale) => {
-    onLocaleChange(locale)
+    onLocaleChange?.(locale)
     setIsOpen(false)
     const redirectTo = `${window.location.pathname}${window.location.search}`
     window.location.assign(

@@ -16,6 +16,7 @@ export async function GET(request: NextRequest) {
     maxAge: ONE_YEAR_SECONDS,
     httpOnly: false,
     sameSite: 'lax',
+    ...(process.env.NODE_ENV === 'production' ? { secure: true } : {}),
   })
 
   return response

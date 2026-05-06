@@ -5,6 +5,9 @@ import { Analytics } from '@vercel/analytics/react'
 import VisitorTracker from '@/components/VisitorTracker'
 import './globals.css'
 
+/** Cookie で語が変わるため、レイアウトを静的キャッシュしない（古い messages が残るのを防ぐ） */
+export const dynamic = 'force-dynamic'
+
 export const metadata: Metadata = {
   title: 'FUJIMAK Maintenance Portal',
   description: 'Fujimak Maintenance Portal',
@@ -40,7 +43,7 @@ export default async function RootLayout({
         <link rel="apple-touch-icon" href="/images/fujimak-rogo.png" />
       </head>
       <body suppressHydrationWarning>
-        <NextIntlClientProvider locale={locale} messages={messages}>
+        <NextIntlClientProvider key={locale} locale={locale} messages={messages}>
           <VisitorTracker />
           {children}
         </NextIntlClientProvider>

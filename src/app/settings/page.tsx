@@ -1,14 +1,14 @@
 'use client'
 
 import { useMemo, useState, useEffect } from 'react'
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import { Globe, LogOut, Mail, Plus, Trash2, Save } from 'lucide-react'
 import Header from '@/components/Header'
 import BottomNav from '@/components/BottomNav'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
 import { signOut } from '@/app/auth/actions'
 import { DEFAULT_VENDORS } from '@/lib/constants'
-import { locales, type Locale } from '@/i18n/config'
+import { defaultLocale, locales, type Locale } from '@/i18n/config'
 
 interface Vendor {
   id: string
@@ -51,10 +51,13 @@ export default function SettingsPage() {
     pass: '',
     from: '',
   })
-  const [currentLocale, setCurrentLocale] = useState<Locale>('en')
   const [isSaving, setIsSaving] = useState(false)
   const [saveFeedback, setSaveFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const t = useTranslations('settings')
+  const nextIntlLocale = useLocale()
+  const uiLocale: Locale = locales.includes(nextIntlLocale as Locale)
+    ? (nextIntlLocale as Locale)
+    : defaultLocale
 
   const normalizeEmail = (email: string) => email.trim().toLowerCase()
 
@@ -101,16 +104,6 @@ export default function SettingsPage() {
   )
 
   useEffect(() => {
-    // Get locale from cookie
-    const cookies = document.cookie.split(';')
-    const localeCookie = cookies.find(c => c.trim().startsWith('locale='))
-    if (localeCookie) {
-      const locale = localeCookie.split('=')[1] as Locale
-      if (locales.includes(locale)) {
-        setCurrentLocale(locale)
-      }
-    }
-
     const loadVendors = async () => {
       let loadedVendorsFromServer = false
       let loadedMechanicsFromServer = false
@@ -557,10 +550,7 @@ export default function SettingsPage() {
             <Globe className="w-5 h-5" />
             {t('language')}
           </h2>
-          <LanguageSwitcher 
-            currentLocale={currentLocale}
-            onLocaleChange={setCurrentLocale}
-          />
+          <LanguageSwitcher currentLocale={uiLocale} />
         </section>
 
         {/* Vendor Settings */}

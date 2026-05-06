@@ -139,6 +139,8 @@ async function upsertMechanicFromBody(body: unknown): Promise<NextResponse> {
 
 async function ensureDefaultMechanics() {
   const supabase = getSupabaseAdmin()
+  /** Insert-only seed: never overwrite names/settings on existing rows (plain upsert updates every GET). */
+  const seedOpts = { onConflict: 'email', ignoreDuplicates: true } as const
   for (const seed of DEFAULT_MECHANICS) {
     const row = {
       name: seed.name,
@@ -151,7 +153,7 @@ async function ensureDefaultMechanics() {
       is_active: true,
       updated_at: new Date().toISOString(),
     }
-    const { error } = await supabase.from('mechanics').upsert(row, { onConflict: 'email' })
+    const { error } = await supabase.from('mechanics').upsert(row, seedOpts)
     if (error) {
       const message = asErrorMessage(error)
       if (isMechanicsTableUnavailableError(message)) throw error
@@ -166,7 +168,7 @@ async function ensureDefaultMechanics() {
             is_active: true,
             updated_at: new Date().toISOString(),
           },
-          { onConflict: 'email' }
+          seedOpts
         )
       if (fallbackError) {
         const fbMsg = asErrorMessage(fallbackError)

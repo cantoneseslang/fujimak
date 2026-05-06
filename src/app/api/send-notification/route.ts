@@ -127,6 +127,17 @@ async function resolveRecipients(options: {
   return fallback.length > 0 ? [fallback] : []
 }
 
+function smtpUserFacingHint(errorMessage: string): string | undefined {
+  const m = errorMessage.toLowerCase()
+  if (m.includes('534') && (m.includes('webloginrequired') || m.includes('log in with your web browser'))) {
+    return 'Gmail がサーバーからの SMTP ログインを拒否しています（アカウントのセキュリティ確認）。ブラウザで同じ Gmail にログインし、https://accounts.google.com/DisplayUnlockCaptcha でロック解除後に再試行するか、2 段階認証＋アプリパスワードを SMTP に設定してください。本番の運用では SendGrid / Resend などの送信専用サービスが確実です。'
+  }
+  if (m.includes('535') && m.includes('badcredentials')) {
+    return 'Gmail がユーザー名・パスワードを拒否しています。Google アカウントのログインパスワードではなく、アプリパスワードを SMTP_PASS に設定してください。'
+  }
+  return undefined
+}
+
 export async function POST(request: NextRequest) {
   try {
     const {
@@ -339,6 +350,12 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Failed to send email:', error)
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json({ success: false, delivered: false, error: errorMessage })
+    const hint = smtpUserFacingHint(errorMessage)
+    return NextResponse.json({
+      success: false,
+      delivered: false,
+      error: errorMessage,
+      ...(hint ? { hint } : {}),
+    })
   }
 }

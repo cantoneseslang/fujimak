@@ -285,9 +285,15 @@ export default function MaintenancePage() {
           skipped?: boolean
           error?: string
           message?: string
+          hint?: string
         }
         if (!notificationRes.ok || notificationJson.success === false) {
-          notificationNote = notificationJson.error || 'Notification failed. Check SMTP settings.'
+          const base = notificationJson.error || 'Notification failed. Check SMTP settings.'
+          const hint =
+            typeof notificationJson.hint === 'string' && notificationJson.hint.trim().length > 0
+              ? `\n\n${notificationJson.hint.trim()}`
+              : ''
+          notificationNote = `${base}${hint}`
           notificationDelivered = false
         } else if (notificationJson.delivered === true) {
           notificationDelivered = true

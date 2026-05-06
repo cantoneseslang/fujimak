@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { useLocale, useTranslations } from 'next-intl'
-import { Minus, Plus, ShoppingCart } from 'lucide-react'
+import { Minus, Plus, ShoppingCart, Loader2 } from 'lucide-react'
 import Header from '@/components/Header'
 import BottomNav from '@/components/BottomNav'
 import { formatAngelPizzaStoreLabel } from '@/lib/angelStores'
@@ -19,7 +19,7 @@ import {
 
 export default function PartsPage() {
   const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null)
-  const [isReady, setIsReady] = useState(false)
+  const [hasReadStorage, setHasReadStorage] = useState(false)
   const [quantities, setQuantities] = useState<Record<string, number>>({})
   const [unitPrices, setUnitPrices] = useState<Record<string, number>>({})
   const [notes, setNotes] = useState('')
@@ -30,13 +30,14 @@ export default function PartsPage() {
   const router = useRouter()
   const locale = useLocale()
   const t = useTranslations('parts')
+  const tCommon = useTranslations('common')
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
+    const frame = requestAnimationFrame(() => {
       setSelectedStoreId(localStorage.getItem('selectedStoreId'))
-      setIsReady(true)
-    }, 0)
-    return () => window.clearTimeout(timer)
+      setHasReadStorage(true)
+    })
+    return () => cancelAnimationFrame(frame)
   }, [])
 
   const selectedStore = useMemo(
@@ -66,11 +67,11 @@ export default function PartsPage() {
   }, [recommendedOnly, recommendedPartIds])
 
   useEffect(() => {
-    if (!isReady) return
+    if (!hasReadStorage) return
     if (!selectedStoreId) {
       router.push('/stores')
     }
-  }, [isReady, router, selectedStoreId])
+  }, [hasReadStorage, router, selectedStoreId])
 
   const selectedItems = useMemo(
     () =>
@@ -145,7 +146,37 @@ export default function PartsPage() {
     router.push('/parts/confirm')
   }
 
-  if (!isReady || !selectedStore) return null
+  if (!hasReadStorage || !selectedStoreId) {
+    return (
+      <div className="min-h-screen bg-gray-50 pb-24">
+        <Header title={t('title')} />
+        <main className="flex flex-col items-center justify-center px-4 pt-16 pb-8">
+          <Loader2 className="h-10 w-10 animate-spin text-zinc-400" aria-hidden />
+          <span className="sr-only">{tCommon('loading')}</span>
+        </main>
+        <BottomNav />
+      </div>
+    )
+  }
+
+  if (!selectedStore) {
+    return (
+      <div className="min-h-screen bg-gray-50 pb-24">
+        <Header title={t('title')} />
+        <main className="flex flex-col items-center px-4 pt-16 pb-8">
+          <p className="text-center text-sm text-zinc-600">{tCommon('error')}</p>
+          <button
+            type="button"
+            onClick={() => router.push('/stores')}
+            className="mt-6 rounded-lg border border-zinc-300 bg-zinc-50 px-4 py-2 text-sm font-semibold text-zinc-900"
+          >
+            {tCommon('back')}
+          </button>
+        </main>
+        <BottomNav />
+      </div>
+    )
+  }
 
   const formattedTotal = new Intl.NumberFormat('en-US', {
     style: 'currency',

@@ -85,6 +85,9 @@ export interface MaintenanceListQuery {
   storeId?: string
   status?: MaintenanceStatus
   limit?: number
+  /** Inclusive YYYY-MM-DD — combined with windowEnd reduces payload for calendar views */
+  windowStart?: string
+  windowEnd?: string
 }
 
 const toQueryString = (query?: MaintenanceListQuery) => {
@@ -93,6 +96,8 @@ const toQueryString = (query?: MaintenanceListQuery) => {
   if (query.storeId) params.set('storeId', query.storeId)
   if (query.status) params.set('status', query.status)
   if (typeof query.limit === 'number') params.set('limit', String(query.limit))
+  if (query.windowStart) params.set('windowStart', query.windowStart)
+  if (query.windowEnd) params.set('windowEnd', query.windowEnd)
   const q = params.toString()
   return q.length > 0 ? `?${q}` : ''
 }
@@ -111,13 +116,13 @@ async function readResponseErrorMessage(res: Response, fallback: string) {
   }
 }
 
-export async function fetchMaintenanceRequests(query?: MaintenanceListQuery) {
+export async function fetchMaintenanceRequests(query?: MaintenanceListQuery, signal?: AbortSignal) {
   const endpoint = `/api/maintenance${toQueryString(query)}`
-  let res = await fetch(endpoint, { cache: 'no-store' })
+  let res = await fetch(endpoint, { cache: 'no-store', signal })
   if (!res.ok) {
     // One quick retry helps absorb transient DB/network hiccups.
     await new Promise((resolve) => setTimeout(resolve, 250))
-    res = await fetch(endpoint, { cache: 'no-store' })
+    res = await fetch(endpoint, { cache: 'no-store', signal })
   }
   if (!res.ok) return []
   const json = (await res.json()) as { requests?: MaintenanceRequestRecord[] }

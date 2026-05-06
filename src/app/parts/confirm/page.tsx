@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { Download, FileCheck2, Send } from 'lucide-react'
+import { Download, FileCheck2, Loader2, Send } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import Header from '@/components/Header'
 import BottomNav from '@/components/BottomNav'
@@ -17,6 +17,7 @@ import {
 export default function PartsOrderConfirmPage() {
   const router = useRouter()
   const t = useTranslations('parts')
+  const tCommon = useTranslations('common')
   const [draft, setDraft] = useState<PartsOrderDraft | null>(null)
   const [isReady, setIsReady] = useState(false)
   const [isSending, setIsSending] = useState(false)
@@ -140,7 +141,18 @@ export default function PartsOrderConfirmPage() {
     }
   }
 
-  if (!isReady || !draft) return null
+  if (!isReady || !draft) {
+    return (
+      <div className="min-h-screen bg-stone-200 pb-40 dark:bg-zinc-950">
+        <Header showBack title={t('confirmTitle')} titleClassName="ml-1.5" />
+        <main className="flex flex-col items-center justify-center px-4 pt-16 pb-8">
+          <Loader2 className="h-10 w-10 animate-spin text-zinc-500" aria-hidden />
+          <span className="sr-only">{tCommon('loading')}</span>
+        </main>
+        <BottomNav />
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-stone-200 pb-40 dark:bg-zinc-950">

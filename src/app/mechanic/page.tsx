@@ -7,11 +7,11 @@ import { Camera, Images, PlayCircle, Wrench, X } from 'lucide-react'
 import Header from '@/components/Header'
 import BottomNav from '@/components/BottomNav'
 import {
-  fetchMaintenanceRequests,
   updateMaintenanceRequest,
   type MaintenanceStatus,
   type MaintenanceRequestRecord,
 } from '@/lib/maintenance'
+import { useInvalidateMaintenanceLists, useMaintenanceRequestsQuery } from '@/hooks/useMaintenanceRequests'
 import type { ForBillingOption } from '@/lib/maintenanceReportForm'
 import {
   MAINTENANCE_CHECKLIST_LABELS,
@@ -161,6 +161,15 @@ export default function MechanicPage() {
   const [activeMechanicId, setActiveMechanicId] = useState('')
   const [activeMechanicName, setActiveMechanicName] = useState('')
 
+  const invalidateMaintenance = useInvalidateMaintenanceLists()
+  const {
+    data: fetchedRequests = [],
+    isPending: maintenancePending,
+  } = useMaintenanceRequestsQuery(
+    { storeId: selectedStoreId ?? '', limit: 220 },
+    Boolean(selectedStoreId) && operationMode === 'production'
+  )
+
   const beforeGalleryInputRef = useRef<HTMLInputElement>(null)
   const beforeCameraInputRef = useRef<HTMLInputElement>(null)
   const afterGalleryInputRef = useRef<HTMLInputElement>(null)
@@ -196,19 +205,16 @@ export default function MechanicPage() {
       }
     }
 
-    const load = async () => {
-      try {
-        const all = await fetchMaintenanceRequests({ storeId, limit: 200 })
-        setRequests(all)
-      } catch {
-        setRequests([])
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    void load()
   }, [router])
+
+  useEffect(() => {
+    if (!selectedStoreId || operationMode !== 'production') {
+      if (operationMode === 'demo') setLoading(false)
+      return
+    }
+    setRequests(fetchedRequests)
+    setLoading(maintenancePending && fetchedRequests.length === 0)
+  }, [selectedStoreId, operationMode, fetchedRequests, maintenancePending])
 
   const scheduledRequests = useMemo(() => {
     return requests.filter((request) => request.status === 'pending' || request.status === 'in_progress')
@@ -457,6 +463,7 @@ export default function MechanicPage() {
         status: 'in_progress',
       })
       setRequests((prev) => prev.map((request) => (request.id === updated.id ? updated : request)))
+      invalidateMaintenance()
       setMessage(t('workStarted'))
       setWorkStartSavedAt(null)
     } catch {
@@ -502,6 +509,7 @@ export default function MechanicPage() {
       })
 
       setRequests((prev) => prev.map((request) => (request.id === json.request?.id ? json.request : request)))
+      invalidateMaintenance()
       setWorkStartSavedAt(json.recordedAt ?? new Date().toISOString())
       setMessage(startSavedSuccess)
     } catch (error) {
@@ -584,6 +592,7 @@ export default function MechanicPage() {
       })
 
       setRequests((prev) => prev.map((request) => (request.id === json.request?.id ? json.request : request)))
+      invalidateMaintenance()
       if (!markCompleted) {
         setBeforeMedia([])
         setAfterMedia([])

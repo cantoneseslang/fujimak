@@ -4,6 +4,11 @@ import { getLocale, getMessages } from 'next-intl/server'
 import { Analytics } from '@vercel/analytics/react'
 import VisitorTracker from '@/components/VisitorTracker'
 import LocalePersistence from '@/components/LocalePersistence'
+import IdleRoutePrefetch from '@/components/IdleRoutePrefetch'
+import NavigationTimingLogger from '@/components/NavigationTimingLogger'
+import DevNavAutopilotResume from '@/components/DevNavAutopilotResume'
+import PortalMaintenanceWarmCache from '@/components/PortalMaintenanceWarmCache'
+import { QueryProviders } from '@/components/QueryProviders'
 import './globals.css'
 
 /** Cookie で語が変わるため、レイアウトを静的キャッシュしない（古い messages が残るのを防ぐ） */
@@ -45,9 +50,15 @@ export default async function RootLayout({
       </head>
       <body suppressHydrationWarning>
         <NextIntlClientProvider key={locale} locale={locale} messages={messages}>
-          <LocalePersistence />
-          <VisitorTracker />
-          {children}
+          <QueryProviders>
+            <NavigationTimingLogger enabled={process.env.NODE_ENV === 'development'} />
+            {process.env.NODE_ENV === 'development' ? <DevNavAutopilotResume /> : null}
+            <PortalMaintenanceWarmCache />
+            <IdleRoutePrefetch />
+            <LocalePersistence />
+            <VisitorTracker />
+            {children}
+          </QueryProviders>
         </NextIntlClientProvider>
         <Analytics />
       </body>

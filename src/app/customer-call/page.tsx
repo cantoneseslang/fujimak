@@ -12,10 +12,12 @@ import {
   URGENCY_LEVELS,
 } from '@/lib/constants'
 import { createMaintenanceRequest } from '@/lib/maintenance'
+import { useInvalidateMaintenanceLists } from '@/hooks/useMaintenanceRequests'
 import { getStoreMachines } from '@/lib/storeMachines'
 
 export default function CustomerCallPage() {
   const router = useRouter()
+  const invalidateMaintenance = useInvalidateMaintenanceLists()
   const searchParams = useSearchParams()
 
   const initialSummary = useMemo(
@@ -71,6 +73,8 @@ export default function CustomerCallPage() {
         troubleshootingSummary: initialSummary || undefined,
         vendorName: 'Fujimak Service Desk',
       })
+
+      invalidateMaintenance()
 
       await fetch('/api/send-notification', {
         method: 'POST',

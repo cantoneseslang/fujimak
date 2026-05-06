@@ -118,12 +118,21 @@ export default function SettingsPage() {
   )
 
   useEffect(() => {
-    const loadVendors = async () => {
+    const loadSettingsBootstrap = async () => {
+      const noStore = { cache: 'no-store' as const }
       let loadedVendorsFromServer = false
       let loadedMechanicsFromServer = false
       let loadedPartsRecipients = false
+
+      const [vendorsRes, mechanicsRes, partsRes, smtpRes] = await Promise.all([
+        fetch('/api/settings/vendors', noStore),
+        fetch('/api/mechanics?includeInactive=1&seedDefault=1', noStore),
+        fetch('/api/settings/parts-order-recipients', noStore),
+        fetch('/api/settings/smtp', noStore),
+      ])
+
       try {
-        const response = await fetch('/api/settings/vendors', { cache: 'no-store' })
+        const response = vendorsRes
         if (!response.ok) throw new Error(`Failed to load vendors (${response.status})`)
         const json = (await response.json()) as {
           vendors?: Array<{
@@ -184,7 +193,7 @@ export default function SettingsPage() {
       }
 
       try {
-        const response = await fetch('/api/mechanics?includeInactive=1&seedDefault=1', { cache: 'no-store' })
+        const response = mechanicsRes
         if (!response.ok) throw new Error(`Failed to load mechanics (${response.status})`)
         const json = (await response.json()) as {
           mechanics?: Array<{
@@ -235,7 +244,7 @@ export default function SettingsPage() {
       }
 
       try {
-        const response = await fetch('/api/settings/parts-order-recipients', { cache: 'no-store' })
+        const response = partsRes
         if (!response.ok) throw new Error(`Failed to load parts recipients (${response.status})`)
         const json = (await response.json()) as {
           recipients?: { id: string; email: string; is_active: boolean }[]
@@ -279,8 +288,9 @@ export default function SettingsPage() {
         setPartsOrderRecipientEmail('')
       }
 
+      let smtpLoadedFromServer = false
       try {
-        const response = await fetch('/api/settings/smtp', { cache: 'no-store' })
+        const response = smtpRes
         if (!response.ok) throw new Error(`Failed to load SMTP settings (${response.status})`)
         const json = (await response.json()) as { smtp?: Partial<SmtpSettings> }
         const smtp = json.smtp ?? {}
@@ -292,9 +302,13 @@ export default function SettingsPage() {
           pass: typeof smtp.pass === 'string' ? smtp.pass : '',
           from: typeof smtp.from === 'string' ? smtp.from : '',
         })
-        return
+        smtpLoadedFromServer = true
       } catch (error) {
         console.error('Failed to load SMTP settings from Supabase:', error)
+      }
+
+      if (smtpLoadedFromServer) {
+        return
       }
 
       const savedSmtpSettings = localStorage.getItem(SMTP_SETTINGS_STORAGE_KEY)
@@ -315,7 +329,7 @@ export default function SettingsPage() {
       }
     }
 
-    void loadVendors()
+    void loadSettingsBootstrap()
   }, [])
 
   const addVendor = () => {

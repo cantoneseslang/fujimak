@@ -1,32 +1,40 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useLocale, useTranslations } from 'next-intl'
-import { Wrench, History, Bell, HelpCircle, BookOpen, ShoppingCart, UserCog, RefreshCw, PenSquare } from 'lucide-react'
+import {
+  Wrench,
+  History,
+  Bell,
+  HelpCircle,
+  BookOpen,
+  ShoppingCart,
+  UserCog,
+  RefreshCw,
+  PenSquare,
+  Loader2,
+} from 'lucide-react'
 import Header from '@/components/Header'
 import BottomNav from '@/components/BottomNav'
 import ChatbotWidget from '@/components/ChatbotWidget'
 import { formatAngelPizzaStoreLabel, formatAngelPizzaStoreLine } from '@/lib/angelStores'
 import { STORES } from '@/lib/constants'
-import { fetchMaintenanceRequests } from '@/lib/maintenance'
+import { useMaintenanceRequestsQuery } from '@/hooks/useMaintenanceRequests'
 
 const MECHANIC_OPERATION_MODE_KEY = 'mechanic-operation-mode-v1'
 
 export default function DashboardPage() {
   const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null)
-  const [storeReady, setStoreReady] = useState(false)
+  const [hasReadStorage, setHasReadStorage] = useState(false)
   const [operationMode, setOperationMode] = useState<'production' | 'demo'>('production')
   const [isModeConfirmOpen, setIsModeConfirmOpen] = useState(false)
   const [modeMessage, setModeMessage] = useState<string | null>(null)
-  const [pendingCount, setPendingCount] = useState(0)
-  const [notificationCount, setNotificationCount] = useState(0)
-  const [recentRequests, setRecentRequests] = useState<
-    { id: string; itemId: string | null; machineLabel: string | null; createdAt: string; status: string }[]
-  >([])
   const router = useRouter()
   const locale = useLocale()
   const t = useTranslations('dashboard')
+  const tCommon = useTranslations('common')
   const tItems = useTranslations('items')
   const tHistory = useTranslations('history')
   const isLatinLocale = locale === 'en' || locale === 'tl'
@@ -40,47 +48,55 @@ export default function DashboardPage() {
     }
   }
 
+  const {
+    data: dashRequests = [],
+    isPending: maintenancePending,
+    isFetching,
+  } = useMaintenanceRequestsQuery(
+    { storeId: selectedStoreId ?? '', limit: 220 },
+    Boolean(hasReadStorage && selectedStoreId)
+  )
+
+  const dataLoading =
+    Boolean(hasReadStorage && selectedStoreId) &&
+    (maintenancePending || (isFetching && dashRequests.length === 0))
+
+  const pendingCount = useMemo(
+    () => dashRequests.filter((request) => request.status === 'pending').length,
+    [dashRequests]
+  )
+
+  const notificationCount = useMemo(
+    () => dashRequests.filter((request) => request.schedule_change_status === 'pending').length,
+    [dashRequests]
+  )
+
+  const recentRequests = useMemo(
+    () =>
+      dashRequests.slice(0, 4).map((request) => ({
+        id: request.id,
+        itemId: request.item_id,
+        machineLabel: request.machine_name ?? request.machine_model,
+        createdAt: request.created_at,
+        status: request.status,
+      })),
+    [dashRequests]
+  )
+
   useEffect(() => {
-    const storeId = localStorage.getItem('selectedStoreId')
-    const savedMode = localStorage.getItem(MECHANIC_OPERATION_MODE_KEY)
-    if (savedMode === 'demo' || savedMode === 'production') {
-      setOperationMode(savedMode)
-    }
-    setSelectedStoreId(storeId)
-    if (!storeId) {
-      setStoreReady(true)
-      router.push('/stores')
-      return
-    }
-
-    const loadCounts = async () => {
-      try {
-        const requests = await fetchMaintenanceRequests({ storeId, limit: 50 })
-        const pending = requests.filter((request) => request.status === 'pending').length
-        const pendingNotification = requests.filter(
-          (request) => request.schedule_change_status === 'pending'
-        ).length
-        setPendingCount(pending)
-        setNotificationCount(pendingNotification)
-        setRecentRequests(
-          requests.slice(0, 4).map((request) => ({
-            id: request.id,
-            itemId: request.item_id,
-            machineLabel: request.machine_name ?? request.machine_model,
-            createdAt: request.created_at,
-            status: request.status,
-          }))
-        )
-      } catch {
-        setPendingCount(0)
-        setNotificationCount(0)
-        setRecentRequests([])
-      } finally {
-        setStoreReady(true)
+    const frame = requestAnimationFrame(() => {
+      const storeId = localStorage.getItem('selectedStoreId')
+      const savedMode = localStorage.getItem(MECHANIC_OPERATION_MODE_KEY)
+      if (savedMode === 'demo' || savedMode === 'production') {
+        setOperationMode(savedMode)
       }
-    }
-
-    void loadCounts()
+      setSelectedStoreId(storeId)
+      setHasReadStorage(true)
+      if (!storeId) {
+        router.push('/stores')
+      }
+    })
+    return () => cancelAnimationFrame(frame)
   }, [router])
 
   useEffect(() => {
@@ -93,8 +109,39 @@ export default function DashboardPage() {
 
   const selectedStore = STORES.find((store) => store.id === selectedStoreId) ?? null
 
-  if (!storeReady || !selectedStore) {
-    return null
+  const bootShell = (
+    <div className="min-h-screen bg-gray-50 pb-24">
+      <Header onRightButtonTripleClick={() => {}} />
+      <main className="flex flex-col items-center justify-center px-4 pt-16 pb-8">
+        <Loader2 className="h-10 w-10 animate-spin text-zinc-400" aria-hidden />
+        <p className="mt-4 text-sm text-zinc-500">{tCommon('loading')}</p>
+      </main>
+      <BottomNav />
+    </div>
+  )
+
+  if (!hasReadStorage || !selectedStoreId) {
+    return bootShell
+  }
+
+  if (!selectedStore) {
+    return (
+      <div className="min-h-screen bg-gray-50 pb-24">
+        <Header onRightButtonTripleClick={() => {}} />
+        <main className="flex flex-col items-center px-4 pt-16 pb-8">
+          <p className="text-center text-base text-zinc-600">{tCommon('error')}</p>
+          <button
+            type="button"
+            onClick={() => router.push('/stores')}
+            className="mt-6 inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-zinc-50 px-4 py-2.5 text-base font-semibold text-zinc-900 shadow-sm transition-colors hover:bg-zinc-100"
+          >
+            <RefreshCw className="h-4 w-4" />
+            {t('changeStore')}
+          </button>
+        </main>
+        <BottomNav />
+      </div>
+    )
   }
 
   const primaryStoreName = isLatinLocale
@@ -163,7 +210,7 @@ export default function DashboardPage() {
       label: 'Management',
       href: '/management',
       color: '#3b82f6',
-      badge: notificationCount,
+      badge: dataLoading ? 0 : notificationCount,
     },
     {
       icon: (
@@ -230,12 +277,19 @@ export default function DashboardPage() {
               <Bell className="w-6 h-6 text-zinc-800" />
               <span className="text-base font-semibold text-zinc-800">{t('pendingRequests')}:</span>
             </div>
-            <span
-              className="mx-auto mt-2 inline-flex h-10 w-10 items-center justify-center rounded-full text-xl font-bold"
-              style={{ backgroundColor: '#111111', color: '#ffffff' }}
-            >
-              {pendingCount}
-            </span>
+            {dataLoading ? (
+              <span
+                className="mx-auto mt-2 inline-flex h-10 w-10 animate-pulse rounded-full bg-zinc-300"
+                aria-hidden
+              />
+            ) : (
+              <span
+                className="mx-auto mt-2 inline-flex h-10 w-10 items-center justify-center rounded-full text-xl font-bold"
+                style={{ backgroundColor: '#111111', color: '#ffffff' }}
+              >
+                {pendingCount}
+              </span>
+            )}
           </div>
         </div>
 
@@ -244,25 +298,24 @@ export default function DashboardPage() {
         {/* Quick Actions */}
         <div className="grid grid-cols-3 gap-4 mb-8">
           {quickActions.map((action) => (
-            <button
+            <Link
               key={action.href}
-              onClick={() => router.push(action.href)}
+              href={action.href}
+              prefetch
               className="flex flex-col items-center gap-4 py-8 px-4 bg-white rounded-xl shadow-sm hover:shadow-md transition-all"
             >
               <div className="relative">
                 <div className="p-5 rounded-full text-white" style={{ backgroundColor: action.color }}>
                   {action.icon}
                 </div>
-                {action.badge > 0 && (
+                {!dataLoading && action.badge > 0 && (
                   <div className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
                     {action.badge}
                   </div>
                 )}
               </div>
-              <span className="text-base font-medium text-gray-700 text-center">
-                {action.label}
-              </span>
-            </button>
+              <span className="text-base font-medium text-gray-700 text-center">{action.label}</span>
+            </Link>
           ))}
         </div>
 
@@ -291,7 +344,13 @@ export default function DashboardPage() {
         <div className="bg-white rounded-xl p-5 shadow-sm">
           <h2 className="font-semibold text-gray-800 mb-4 text-lg" style={{ marginLeft: '6px' }}>{t('recentRequests')}</h2>
 
-          {recentRequests.length === 0 ? (
+          {dataLoading ? (
+            <div className="space-y-3 py-2">
+              {[1, 2, 3].map((key) => (
+                <div key={key} className="h-16 animate-pulse rounded-lg bg-zinc-100" />
+              ))}
+            </div>
+          ) : recentRequests.length === 0 ? (
             <div className="text-center py-6 text-gray-400">
               <History className="w-12 h-12 mx-auto mb-2 opacity-50" />
               <p>{t('noRequests')}</p>

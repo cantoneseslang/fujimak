@@ -162,6 +162,8 @@ async function selectMaintenanceListWithFallback(params: {
   statusRaw: string
   limit: number
   full: boolean
+  /** Narrow result set (e.g. calendar window). Applied after store/status filters. */
+  applyFilter?: (query: unknown) => unknown
 }) {
   let columns = params.full ? ['*'] : [...LIGHT_LIST_COLUMNS]
   const droppedColumns: string[] = []
@@ -176,6 +178,10 @@ async function selectMaintenanceListWithFallback(params: {
     if (params.storeId) query = query.eq('store_id', params.storeId)
     if (params.statusRaw && MAINTENANCE_STATUS.has(params.statusRaw as MaintenanceStatus)) {
       query = query.eq('status', params.statusRaw)
+    }
+
+    if (params.applyFilter) {
+      query = params.applyFilter(query) as typeof query
     }
 
     const { data, error } = await query
@@ -204,6 +210,89 @@ async function selectMaintenanceListWithFallback(params: {
   }
 
   throw new Error('Failed to load maintenance list after schema fallback retries')
+}
+
+function dedupeMaintenanceRows(parts: unknown[][]): unknown[] {
+  const map = new Map<string, unknown>()
+  for (const part of parts) {
+    for (const row of part) {
+      const record = (row ?? {}) as Record<string, unknown>
+      const id = asText(record.id)
+      if (id.length > 0 && !map.has(id)) {
+        map.set(id, row)
+      }
+    }
+  }
+  return [...map.values()]
+}
+
+/** Narrow shape for Supabase query chaining inside applyFilter callbacks */
+type MaintenanceFilterChain = {
+  gte: (column: string, value: string) => MaintenanceFilterChain
+  lte: (column: string, value: string) => MaintenanceFilterChain
+  is: (column: string, value: null) => MaintenanceFilterChain
+  in: (column: string, values: string[]) => MaintenanceFilterChain
+}
+
+async function selectMaintenanceListWindowMerged(params: {
+  supabase: ReturnType<typeof getSupabaseAdmin>
+  storeId: string
+  statusRaw: string
+  limit: number
+  full: boolean
+  windowStart: string
+  windowEnd: string
+}): Promise<{ rows: unknown[]; droppedColumns: string[] }> {
+  const branchLimit = Math.min(260, Math.max(100, Math.ceil(params.limit / 2)))
+
+  const scheduledP = selectMaintenanceListWithFallback({
+    supabase: params.supabase,
+    storeId: params.storeId,
+    statusRaw: params.statusRaw,
+    limit: branchLimit,
+    full: params.full,
+    applyFilter: (rawQuery) => {
+      const q = rawQuery as MaintenanceFilterChain
+      return q.gte('scheduled_date', params.windowStart).lte('scheduled_date', params.windowEnd)
+    },
+  })
+
+  const preferredP = selectMaintenanceListWithFallback({
+    supabase: params.supabase,
+    storeId: params.storeId,
+    statusRaw: params.statusRaw,
+    limit: branchLimit,
+    full: params.full,
+    applyFilter: (rawQuery) => {
+      const q = rawQuery as MaintenanceFilterChain
+      return q.gte('preferred_date', params.windowStart).lte('preferred_date', params.windowEnd)
+    },
+  })
+
+  const undatedActiveP = selectMaintenanceListWithFallback({
+    supabase: params.supabase,
+    storeId: params.storeId,
+    statusRaw: '',
+    limit: 120,
+    full: params.full,
+    applyFilter: (rawQuery) => {
+      const q = rawQuery as MaintenanceFilterChain
+      return q.is('scheduled_date', null).in('status', ['pending', 'in_progress'])
+    },
+  })
+
+  const [scheduled, preferred, undatedActive] = await Promise.all([scheduledP, preferredP, undatedActiveP])
+
+  const merged = dedupeMaintenanceRows([scheduled.rows, preferred.rows, undatedActive.rows]).slice(
+    0,
+    params.limit
+  )
+
+  const droppedColumns = [
+    ...new Set([...scheduled.droppedColumns, ...preferred.droppedColumns, ...undatedActive.droppedColumns]),
+  ]
+
+  return { rows: merged, droppedColumns }
 }
 
 type ActiveMechanic = {
@@ -275,11 +364,39 @@ export async function GET(request: NextRequest) {
   try {
     const statusRaw = asText(request.nextUrl.searchParams.get('status'))
     const storeId = asText(request.nextUrl.searchParams.get('storeId'))
+    const windowStart = asText(request.nextUrl.searchParams.get('windowStart'))
+    const windowEnd = asText(request.nextUrl.searchParams.get('windowEnd'))
+    const windowOk =
+      /^\d{4}-\d{2}-\d{2}$/.test(windowStart) &&
+      /^\d{4}-\d{2}-\d{2}$/.test(windowEnd) &&
+      windowStart <= windowEnd
+
     const limitRaw = Number(request.nextUrl.searchParams.get('limit'))
-    const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(200, limitRaw)) : 100
+    const maxLimit = windowOk ? 500 : 350
+    const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(maxLimit, limitRaw)) : windowOk ? 400 : 100
     const full = asText(request.nextUrl.searchParams.get('full')) === '1'
 
     const supabase = getSupabaseAdmin()
+
+    if (windowOk) {
+      const { rows, droppedColumns } = await selectMaintenanceListWindowMerged({
+        supabase,
+        storeId,
+        statusRaw,
+        limit,
+        full,
+        windowStart,
+        windowEnd,
+      })
+      return NextResponse.json({
+        requests: rows,
+        warning:
+          droppedColumns.length > 0
+            ? `List loaded with schema fallback. Missing columns skipped: ${droppedColumns.join(', ')}`
+            : undefined,
+      })
+    }
+
     const { rows, droppedColumns } = await selectMaintenanceListWithFallback({
       supabase,
       storeId,

@@ -20,10 +20,12 @@ export default function BottomNav() {
   const navRef = useRef<HTMLElement>(null)
   
   useEffect(() => {
-    const storeId = localStorage.getItem('selectedStoreId')
-    if (!storeId) return
-
     const load = async () => {
+      const storeId = localStorage.getItem('selectedStoreId')
+      if (!storeId) {
+        setNotificationCount(0)
+        return
+      }
       try {
         const res = await fetch(`/api/maintenance/notifications?storeId=${encodeURIComponent(storeId)}&status=pending`, {
           cache: 'no-store',
@@ -31,13 +33,24 @@ export default function BottomNav() {
         if (!res.ok) return
         const json = (await res.json()) as { notifications?: unknown[] }
         setNotificationCount((json.notifications ?? []).length)
-      } catch (error) {
+      } catch {
         setNotificationCount(0)
       }
     }
 
     void load()
-  }, [pathname]) // pathname変更時に再チェック
+    const intervalMs = 45_000
+    const interval = window.setInterval(() => void load(), intervalMs)
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') void load()
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+
+    return () => {
+      window.clearInterval(interval)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
+  }, [])
 
   useEffect(() => {
     const updateBottomNavHeight = () => {

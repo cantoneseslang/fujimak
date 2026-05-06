@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Archive, ChevronRight, Search } from 'lucide-react'
+import { Archive, ChevronRight, Download, Search } from 'lucide-react'
 import Header from '@/components/Header'
 
 type CompletedDocument = {
@@ -35,6 +35,13 @@ const MAINTENANCE_FOLDERS = [
   { folder: 'maintenance/invoices', label: 'Maintenance Invoice' },
 ] as const
 
+function kindLabel(kind: CompletedDocument['kind']) {
+  if (kind === 'maintenance_request') return 'Maintenance Request'
+  if (kind === 'maintenance_signed') return 'Client Signed Report'
+  if (kind === 'maintenance_invoice') return 'Maintenance Invoice'
+  return 'Parts Invoice'
+}
+
 export default function ManagementDocsPage() {
   const [documents, setDocuments] = useState<CompletedDocument[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -43,6 +50,7 @@ export default function ManagementDocsPage() {
   const [search, setSearch] = useState('')
   const [actionMessage, setActionMessage] = useState<string | null>(null)
   const [isBackfilling, setIsBackfilling] = useState(false)
+  const [downloadingDocumentId, setDownloadingDocumentId] = useState<string | null>(null)
   const [openFolders, setOpenFolders] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(MAINTENANCE_FOLDERS.map(({ folder }) => [folder, false]))
   )
@@ -116,6 +124,59 @@ export default function ManagementDocsPage() {
     }))
   }, [filteredDocuments])
 
+  const getDocumentPreviewUrl = useCallback((doc: CompletedDocument) => {
+    const identifier = doc.request_id || doc.workflow_id || ''
+    if (!identifier) return ''
+    if (doc.kind === 'maintenance_invoice') {
+      return `/api/mechanic/invoice/reissue?requestId=${encodeURIComponent(identifier)}&inline=1&mode=invoice&filename=${encodeURIComponent(doc.filename)}`
+    }
+    if (doc.kind === 'maintenance_request' || doc.kind === 'maintenance_signed') {
+      return `/api/mechanic/invoice/reissue?requestId=${encodeURIComponent(identifier)}&inline=1&mode=report&filename=${encodeURIComponent(doc.filename)}`
+    }
+    return `/api/parts-order/workflows/${encodeURIComponent(identifier)}/invoice/reissue?inline=1`
+  }, [])
+
+  const handleDownload = useCallback(async (doc: CompletedDocument) => {
+    const identifier = doc.request_id || doc.workflow_id || ''
+    if (!identifier) return
+    setActionMessage(null)
+    setDownloadingDocumentId(doc.id)
+    try {
+      const endpoint =
+        doc.kind === 'parts_invoice'
+          ? `/api/parts-order/workflows/${encodeURIComponent(identifier)}/invoice/reissue`
+          : `/api/mechanic/invoice/reissue?requestId=${encodeURIComponent(identifier)}&mode=${doc.kind === 'maintenance_invoice' ? 'invoice' : 'report'}&filename=${encodeURIComponent(doc.filename)}`
+      const res = await fetch(endpoint, { cache: 'no-store' })
+      if (!res.ok) {
+        const json = (await res.json().catch(() => ({}))) as { error?: string }
+        throw new Error(json.error || 'Failed to download PDF')
+      }
+      const blob = await res.blob()
+      const disposition = res.headers.get('Content-Disposition')
+      const matched = disposition?.match(/filename="([^"]+)"/)
+      const filename = matched?.[1] || doc.filename || `${doc.id}.pdf`
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = filename
+      anchor.rel = 'noopener'
+      anchor.click()
+      URL.revokeObjectURL(url)
+      setActionMessage(`Downloaded: ${filename}`)
+    } catch (err) {
+      setActionMessage(err instanceof Error ? err.message : 'Failed to download PDF')
+    } finally {
+      setDownloadingDocumentId(null)
+    }
+  }, [])
+
+  const toggleFolderOpen = useCallback((folderKey: string) => {
+    setOpenFolders((prev) => ({
+      ...prev,
+      [folderKey]: !(prev[folderKey] ?? false),
+    }))
+  }, [])
+
   const handleBackfill = useCallback(async () => {
     setActionMessage(null)
     setIsBackfilling(true)
@@ -150,7 +211,7 @@ export default function ManagementDocsPage() {
     <div className="min-h-screen bg-gray-50">
       <Header showBack title="Docs Folder" />
       <main className="px-4 py-4 pb-8">
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div className="bg-white rounded-xl shadow-sm">
           <div className="px-4 py-3 border-b border-gray-100 bg-gray-50 flex items-center justify-between gap-2">
             <h2 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
               <Archive className="w-4 h-4" />
@@ -202,33 +263,85 @@ export default function ManagementDocsPage() {
                 const isOpen = openFolders[group.folder] === true
                 const panelId = `docs-folder-${group.folder.replace(/\//g, '-')}`
                 return (
-                  <section key={group.folder} className="border-b border-gray-100 py-2 last:border-b-0">
-                    <button
-                      type="button"
-                      id={`${panelId}-trigger`}
-                      aria-expanded={isOpen}
-                      aria-controls={panelId}
-                      onClick={() =>
-                        setOpenFolders((prev) => ({
-                          ...prev,
-                          [group.folder]: !prev[group.folder],
-                        }))
-                      }
-                      className="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-left text-sm font-semibold text-gray-800"
-                    >
-                      <ChevronRight
-                        className={`h-4 w-4 shrink-0 text-gray-500 transition-transform ${isOpen ? 'rotate-90' : ''}`}
-                        aria-hidden
-                      />
-                      <span className="min-w-0 flex-1 truncate text-sm font-semibold text-gray-800">
-                        {`${group.heading}(${group.docs.length})`}
-                      </span>
-                    </button>
+                  <section key={group.folder} className="relative border-b border-gray-100 py-2 last:border-b-0">
+                    <div className="flex min-h-11 w-full items-stretch gap-1">
+                      <button
+                        type="button"
+                        id={`${panelId}-trigger`}
+                        aria-expanded={isOpen}
+                        aria-controls={panelId}
+                        onClick={() => toggleFolderOpen(group.folder)}
+                        className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md text-gray-600"
+                      >
+                        <ChevronRight
+                          className={`h-5 w-5 transition-transform ${isOpen ? 'rotate-90' : ''}`}
+                          aria-hidden
+                        />
+                      </button>
+                      <button
+                        type="button"
+                        aria-expanded={isOpen}
+                        aria-controls={panelId}
+                        onClick={() => toggleFolderOpen(group.folder)}
+                        className="min-h-11 min-w-0 flex-1 touch-manipulation rounded-md px-1 py-2 text-left text-sm font-semibold text-gray-800"
+                      >
+                        <span className="block truncate">{`${group.heading}(${group.docs.length})`}</span>
+                      </button>
+                    </div>
                     {isOpen ? (
-                      <div id={panelId} role="region" aria-labelledby={`${panelId}-trigger`} className="px-2 pb-2 pl-8">
+                      <div id={panelId} role="region" aria-labelledby={`${panelId}-trigger`} className="px-2 pb-2 pl-2">
                         {group.docs.length === 0 ? (
                           <p className="text-xs text-gray-500">No files in this folder.</p>
-                        ) : null}
+                        ) : (
+                          <ul className="mt-1 divide-y divide-gray-100 rounded-md border border-gray-100 bg-white">
+                            {group.docs.map((doc) => {
+                              const identifier = doc.request_id || doc.workflow_id || '-'
+                              const issuedAt = doc.issued_at || doc.completed_at || doc.updated_at
+                              const previewUrl = getDocumentPreviewUrl(doc)
+                              return (
+                                <li key={doc.id} className="px-2 py-2.5">
+                                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                    <div className="min-w-0 flex-1">
+                                      <p className="truncate text-sm font-medium text-gray-800">
+                                        {doc.store_name || doc.store_id || '-'} · {kindLabel(doc.kind)}
+                                      </p>
+                                      <p className="mt-0.5 truncate text-xs text-gray-500">
+                                        {doc.request_id ? `Request ID: ${identifier}` : `Workflow ID: ${identifier}`}
+                                      </p>
+                                      <p className="mt-0.5 truncate text-xs text-gray-500">File: {doc.filename}</p>
+                                      <p className="mt-0.5 text-xs text-gray-500">
+                                        Issued: {issuedAt ? new Date(issuedAt).toLocaleString() : '-'}
+                                      </p>
+                                    </div>
+                                    <div className="flex shrink-0 flex-wrap gap-2">
+                                      {previewUrl ? (
+                                        <a
+                                          href={previewUrl}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-semibold text-gray-800"
+                                          style={{ minHeight: '36px' }}
+                                        >
+                                          View PDF
+                                        </a>
+                                      ) : null}
+                                      <button
+                                        type="button"
+                                        onClick={() => void handleDownload(doc)}
+                                        disabled={downloadingDocumentId === doc.id || !previewUrl}
+                                        className="inline-flex items-center gap-1 rounded-md bg-zinc-900 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
+                                        style={{ minHeight: '36px' }}
+                                      >
+                                        <Download className="h-3 w-3" />
+                                        {downloadingDocumentId === doc.id ? 'Downloading...' : 'Download'}
+                                      </button>
+                                    </div>
+                                  </div>
+                                </li>
+                              )
+                            })}
+                          </ul>
+                        )}
                       </div>
                     ) : null}
                   </section>

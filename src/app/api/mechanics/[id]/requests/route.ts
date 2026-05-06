@@ -141,6 +141,19 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ id
       }
     }
 
+    /** Shared queue fallback: if no assignment/vendor match, expose open jobs so any mechanic can proceed. */
+    if (requests.length === 0) {
+      const { data: sharedRows, error: sharedError } = await supabase
+        .from('maintenance_requests')
+        .select('*')
+        .in('status', ['in_progress', 'pending'])
+        .order('updated_at', { ascending: false })
+        .limit(200)
+      if (!sharedError && Array.isArray(sharedRows)) {
+        requests = sharedRows
+      }
+    }
+
     return NextResponse.json({ requests })
   } catch (error) {
     return NextResponse.json({ error: asErrorMessage(error) }, { status: 500 })

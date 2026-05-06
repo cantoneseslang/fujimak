@@ -115,16 +115,19 @@ export default function MechanicBoardPage() {
         setSelectedMechanicId(savedId)
       } else {
         localStorage.removeItem(MECHANIC_PROFILE_KEY)
-        setSelectedMechanicId('')
-        setLoginError(
-          'Saved mechanic no longer matches the server list. Select your mechanic again and tap Enter.'
-        )
+        setSelectedMechanicId(mechanics[0]?.id ?? '')
+        setLoginError('Saved mechanic profile was reset. Continue with the default mechanic or switch account.')
       }
     } catch {
       localStorage.removeItem(MECHANIC_PROFILE_KEY)
-      setSelectedMechanicId('')
+      setSelectedMechanicId(mechanics[0]?.id ?? '')
     }
   }, [mechanics])
+
+  useEffect(() => {
+    if (selectedMechanicId || mechanics.length === 0) return
+    setSelectedMechanicId(mechanics[0]?.id ?? '')
+  }, [mechanics, selectedMechanicId])
 
   useEffect(() => {
     if (!selectedMechanicId) return
@@ -133,11 +136,15 @@ export default function MechanicBoardPage() {
 
   const handleEnterBoard = () => {
     setLoginError(null)
-    if (!selectedMechanic) {
+    const effectiveMechanic = selectedMechanic ?? mechanics[0] ?? null
+    if (!effectiveMechanic) {
       setLoginError('Please choose a mechanic account.')
       return
     }
-    const expectedCode = asText(selectedMechanic.login_code)
+    if (!selectedMechanicId) {
+      setSelectedMechanicId(effectiveMechanic.id)
+    }
+    const expectedCode = asText(effectiveMechanic.login_code)
     if (expectedCode && expectedCode !== inputCode.trim()) {
       setLoginError('Invalid login code.')
       return
@@ -145,12 +152,12 @@ export default function MechanicBoardPage() {
     localStorage.setItem(
       MECHANIC_PROFILE_KEY,
       JSON.stringify({
-        mechanicId: selectedMechanic.id,
-        mechanicName: selectedMechanic.name,
-        mechanicEmail: selectedMechanic.email,
+        mechanicId: effectiveMechanic.id,
+        mechanicName: effectiveMechanic.name,
+        mechanicEmail: effectiveMechanic.email,
       })
     )
-    void loadBoard(selectedMechanic.id)
+    void loadBoard(effectiveMechanic.id)
   }
 
   const openWorkScreen = (request: MaintenanceRequest) => {

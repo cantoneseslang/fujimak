@@ -322,9 +322,6 @@ export default function MechanicReportConfirmPage() {
   const recordedTime = getLatestRecordedTime(record?.remarks ?? null) || asText(record?.completed_at)
   const latestComment = getLatestComment(record?.remarks ?? null) || '-'
 
-  const extraBeforeCount = Math.max(0, beforeImages.length - 1)
-  const extraAfterCount = Math.max(0, afterImages.length - 1)
-
   const hasSignature = signatureDataUrl.length > 0
 
   const buildDemoData = () => ({
@@ -996,17 +993,6 @@ export default function MechanicReportConfirmPage() {
                             </div>
                           </div>
                         </div>
-                        {(extraBeforeCount > 0 || extraAfterCount > 0) && (
-                          <p className="mt-2 text-xs leading-relaxed text-zinc-500" style={{ marginLeft: '6px' }}>
-                            このプレビューとPDFは、Before / After{' '}
-                            <strong className="font-medium text-zinc-600">それぞれ最新の1枚</strong>
-                            のみ表示します（保存パスの before／after で区分し、複数ある場合はファイル名の時刻が新しいもの）。
-                            {extraBeforeCount > 0 ? ` Before ほか${extraBeforeCount}枚` : ''}
-                            {extraBeforeCount > 0 && extraAfterCount > 0 ? '、' : ''}
-                            {extraAfterCount > 0 ? ` After ほか${extraAfterCount}枚` : ''}
-                            がリクエストに添付されています。
-                          </p>
-                        )}
                       </>
                     )}
                   </div>

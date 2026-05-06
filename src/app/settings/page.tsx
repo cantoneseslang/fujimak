@@ -428,6 +428,10 @@ export default function SettingsPage() {
 
   const runSmtpTest = async () => {
     setSmtpTestFeedback(null)
+    // Chrome autofill often paints values before `input.value` is readable in the same tick.
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+    })
     const merged: SmtpSettings = {
       host: smtpHostRef.current?.value.trim() || smtpSettings.host.trim(),
       port: smtpPortRef.current?.value.trim() || smtpSettings.port.trim() || '465',
@@ -435,18 +439,6 @@ export default function SettingsPage() {
       user: smtpUserRef.current?.value.trim() || smtpSettings.user.trim(),
       pass: smtpPassRef.current?.value.trim() || smtpSettings.pass.trim(),
       from: smtpFromRef.current?.value.trim() || smtpSettings.from.trim(),
-    }
-    if (!merged.host || !merged.user) {
-      setSmtpTestFeedback({
-        type: 'error',
-        explanation: {
-          title: t('smtpTestMissingCredentialsTitle'),
-          summary: t('smtpTestMissingCredentialsSummary'),
-          actions: [],
-          technical: '',
-        },
-      })
-      return
     }
     setSmtpSettings((prev) => ({ ...prev, ...merged }))
     setIsSmtpTesting(true)

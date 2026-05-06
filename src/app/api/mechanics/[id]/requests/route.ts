@@ -24,6 +24,10 @@ const FALLBACK_MECHANIC_MAP: Record<string, string> = {
   'fallback-mechanic-3': 'mechanicC',
 }
 
+function uniqueNonEmpty(values: Array<string | null | undefined>) {
+  return Array.from(new Set(values.map((value) => asText(value)).filter(Boolean)))
+}
+
 /** Synthetic board IDs use vendor_name fallback; real UUIDs must align with /mechanic client matching */
 function isUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
@@ -70,17 +74,38 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ id
         throw error
       }
     }
-    const fallbackMechanicName = FALLBACK_MECHANIC_MAP[mechanicId]
-    if (fallbackMechanicName && requests.length === 0) {
-      const { data: fallbackRows, error: fallbackError } = await supabase
-        .from('maintenance_requests')
-        .select('*')
-        .ilike('vendor_name', fallbackMechanicName)
-        .in('status', ['in_progress', 'pending'])
-        .order('updated_at', { ascending: false })
-        .limit(200)
-      if (!fallbackError && Array.isArray(fallbackRows)) {
-        requests = fallbackRows
+    if (requests.length === 0) {
+      const fallbackMechanicName = FALLBACK_MECHANIC_MAP[mechanicId]
+      let mechanicNameFromProfile: string | null = null
+      let mechanicEmailFromProfile: string | null = null
+
+      const { data: mechanicProfile } = await supabase
+        .from('mechanics')
+        .select('name,email')
+        .eq('id', mechanicId)
+        .maybeSingle()
+      mechanicNameFromProfile = asText(mechanicProfile?.name) || null
+      mechanicEmailFromProfile = asText(mechanicProfile?.email) || null
+
+      const emailPrefix = mechanicEmailFromProfile?.split('@')[0] ?? null
+      const vendorNameCandidates = uniqueNonEmpty([
+        fallbackMechanicName,
+        mechanicNameFromProfile,
+        emailPrefix,
+      ])
+
+      for (const candidate of vendorNameCandidates) {
+        const { data: fallbackRows, error: fallbackError } = await supabase
+          .from('maintenance_requests')
+          .select('*')
+          .ilike('vendor_name', candidate)
+          .in('status', ['in_progress', 'pending'])
+          .order('updated_at', { ascending: false })
+          .limit(200)
+        if (!fallbackError && Array.isArray(fallbackRows) && fallbackRows.length > 0) {
+          requests = fallbackRows
+          break
+        }
       }
     }
 

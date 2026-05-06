@@ -182,22 +182,26 @@ export async function POST(request: NextRequest) {
     let stateUpdateError = ''
     if (shouldSend && targetEmail) {
       const smtpSettings = await resolveSmtpConfigFromSettings()
-      const envPass = asText(process.env.SMTP_PASS)
       const dbPass = asText(smtpSettings?.pass)
-      const smtpPass = envPass || dbPass
+      const envPass = asText(process.env.SMTP_PASS)
+      /** Keep behavior consistent with Settings SMTP test: saved DB config wins, env is fallback only. */
+      const smtpPass = dbPass || envPass
       if (!smtpPass) {
         emailError = 'Missing SMTP password (set Vercel SMTP_PASS or Settings → SMTP Password).'
       } else {
         try {
           const authUser =
-            asText(process.env.SMTP_USER) || asText(smtpSettings?.user) || 'info@lifesupporthk.com'
+            asText(smtpSettings?.user) || asText(process.env.SMTP_USER) || 'info@lifesupporthk.com'
           const transporter = nodemailer.createTransport({
-            host: asText(process.env.SMTP_HOST) || asText(smtpSettings?.host) || 'smtp.gmail.com',
-            port: Number(asText(process.env.SMTP_PORT) || asText(smtpSettings?.port) || '465'),
+            host: asText(smtpSettings?.host) || asText(process.env.SMTP_HOST) || 'smtp.gmail.com',
+            port: Number(asText(smtpSettings?.port) || asText(process.env.SMTP_PORT) || '465'),
             secure:
               String(
-                asText(process.env.SMTP_SECURE) ||
-                  (smtpSettings?.secure === false ? 'false' : 'true')
+                smtpSettings?.secure === false
+                  ? 'false'
+                  : smtpSettings?.secure === true
+                    ? 'true'
+                    : asText(process.env.SMTP_SECURE) || 'true'
               ) !== 'false',
             auth: {
               user: authUser,
@@ -206,8 +210,8 @@ export async function POST(request: NextRequest) {
           })
 
           const fromHeader =
-            asText(process.env.SMTP_FROM) ||
             asText(smtpSettings?.from) ||
+            asText(process.env.SMTP_FROM) ||
             `"Fujimak Maintenance" <${authUser}>`
 
           const subject = `Maintenance Report (${asText(record.store_name) || asText(record.store_id)})`

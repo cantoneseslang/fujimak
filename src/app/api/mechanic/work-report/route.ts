@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import nodemailer from 'nodemailer'
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin'
+import { resolveSmtpConfigFromSettings } from '@/lib/smtpNotificationSettings'
 import { buildMechanicWorkReportPdf } from '@/lib/mechanicWorkReportPdf'
 import type { MaintenanceRequestRecord } from '@/lib/maintenance'
 import { buildMaintenanceReportFormState, serializeMaintenanceReportForm } from '@/lib/maintenanceReportForm'
@@ -179,20 +180,34 @@ export async function POST(request: NextRequest) {
     let emailError = ''
     let stateUpdateError = ''
     if (shouldSend && targetEmail) {
-      const smtpPass = asText(process.env.SMTP_PASS)
+      const smtpSettings = await resolveSmtpConfigFromSettings()
+      const envPass = asText(process.env.SMTP_PASS)
+      const dbPass = asText(smtpSettings?.pass)
+      const smtpPass = envPass || dbPass
       if (!smtpPass) {
-        emailError = 'Missing SMTP_PASS'
+        emailError = 'Missing SMTP password (set Vercel SMTP_PASS or Settings → SMTP Password).'
       } else {
         try {
+          const authUser =
+            asText(process.env.SMTP_USER) || asText(smtpSettings?.user) || 'info@lifesupporthk.com'
           const transporter = nodemailer.createTransport({
-            host: process.env.SMTP_HOST || 'smtp.titan.email',
-            port: Number(process.env.SMTP_PORT || '465'),
-            secure: String(process.env.SMTP_SECURE || 'true') !== 'false',
+            host: asText(process.env.SMTP_HOST) || asText(smtpSettings?.host) || 'smtp.gmail.com',
+            port: Number(asText(process.env.SMTP_PORT) || asText(smtpSettings?.port) || '465'),
+            secure:
+              String(
+                asText(process.env.SMTP_SECURE) ||
+                  (smtpSettings?.secure === false ? 'false' : 'true')
+              ) !== 'false',
             auth: {
-              user: process.env.SMTP_USER || 'info@lifesupporthk.com',
+              user: authUser,
               pass: smtpPass,
             },
           })
+
+          const fromHeader =
+            asText(process.env.SMTP_FROM) ||
+            asText(smtpSettings?.from) ||
+            `"Fujimak Maintenance" <${authUser}>`
 
           const subject = `Maintenance Report (${asText(record.store_name) || asText(record.store_id)})`
           const machineLabel = asText(record.machine_name) || asText(record.machine_model) || '-'
@@ -207,9 +222,7 @@ export async function POST(request: NextRequest) {
           ].join('\n')
 
           await transporter.sendMail({
-            from:
-              process.env.SMTP_FROM ||
-              `"Fujimak Maintenance" <${process.env.SMTP_USER || 'info@lifesupporthk.com'}>`,
+            from: fromHeader,
             to: targetEmail,
             subject,
             text,
@@ -239,6 +252,10 @@ export async function POST(request: NextRequest) {
           emailSent = true
         } catch (error) {
           emailError = asErrorMessage(error)
+          if (/535|authentication failed/i.test(emailError.toLowerCase())) {
+            emailError +=
+              ' SMTP auth failed: use an App Password for Gmail, matching SMTP_USER and SMTP_PASS. On Vercel, SMTP_PASS overrides Settings until cleared.'
+          }
         }
       }
     } else if (shouldSend) {

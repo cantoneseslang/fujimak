@@ -18,6 +18,18 @@ function asErrorMessage(error: unknown) {
   }
 }
 
+const BOARD_REQUEST_COLUMNS = [
+  'id',
+  'store_id',
+  'store_name',
+  'machine_name',
+  'machine_serial',
+  'fault_location',
+  'status',
+  'scheduled_date',
+  'preferred_date',
+].join(',')
+
 export async function GET(_request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params
@@ -32,7 +44,7 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ id
     const supabase = getSupabaseAdmin()
     const { data: sharedRows, error: sharedError } = await supabase
       .from('maintenance_requests')
-      .select('*')
+      .select(BOARD_REQUEST_COLUMNS)
       .in('status', ['in_progress', 'pending'])
       .order('updated_at', { ascending: false })
       .limit(200)

@@ -108,7 +108,8 @@ export async function POST(request: NextRequest) {
       maintenanceReport: mergedReportForm,
     })
     const filename = `${reportNo}.pdf`
-    const archivePath = maintenanceInvoiceArchivePath(requestId, filename)
+    const canonicalFilename = `invoice-${requestId}.pdf`
+    const archivePath = maintenanceInvoiceArchivePath(requestId, canonicalFilename)
     let archiveSaved = false
     try {
       await uploadArchivedPdf({

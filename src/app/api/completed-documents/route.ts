@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin'
 import {
   getArchiveBucketName,
+  maintenanceRequestArchivePath,
+  maintenanceSignedArchivePath,
+  maintenanceLegacyArchivePath,
   maintenanceInvoiceArchivePath,
   partsInvoiceArchivePath,
 } from '@/lib/documentArchiveStorage'
@@ -10,7 +13,7 @@ export const runtime = 'nodejs'
 
 type CompletedDocumentRow = {
   id: string
-  kind: 'maintenance_invoice' | 'maintenance_report' | 'parts_invoice'
+  kind: 'maintenance_request' | 'maintenance_signed' | 'maintenance_invoice' | 'parts_invoice'
   request_id: string | null
   workflow_id: string | null
   store_id: string
@@ -83,7 +86,7 @@ export async function GET(request: NextRequest) {
     const maintenanceResult = await supabase
       .from('maintenance_requests')
       .select('*')
-      .eq('status', 'completed')
+      .in('status', ['in_progress', 'completed'])
       .order('updated_at', { ascending: false })
       .limit(limit)
     if (maintenanceResult.error) throw maintenanceResult.error
@@ -110,34 +113,100 @@ export async function GET(request: NextRequest) {
       return hasInvoiceFile || hasIssuedAt
     })
 
-    const maintenanceDocs: CompletedDocumentRow[] = maintenanceRows.map((row) => {
+    const maintenanceDocs: CompletedDocumentRow[] = maintenanceRows.flatMap((row) => {
       const requestId = asText(row.id)
-      const hasInvoiceFile = asText(row.invoice_pdf_filename).length > 0
-      const hasInvoiceIssuedAt = asText(row.invoice_issued_at).length > 0
-      const hasInvoiceAmount = asNullablePositiveNumber(row.invoice_amount) !== null
-      const isInvoice = hasInvoiceFile || hasInvoiceIssuedAt || hasInvoiceAmount
-      const filename = isInvoice
-        ? asText(row.invoice_pdf_filename) || `invoice-${requestId}.pdf`
-        : `work-report-${requestId}.pdf`
-      const archivePath =
-        asNullableText(row.invoice_archive_path) || maintenanceInvoiceArchivePath(requestId, filename)
-      return {
-        id: `maintenance:${requestId}`,
-        kind: isInvoice ? 'maintenance_invoice' : 'maintenance_report',
-        request_id: requestId || null,
-        workflow_id: null,
-        store_id: asText(row.store_id),
-        store_name: asText(row.store_name),
-        title: toMaintenanceTitle(row),
-        filename,
-        issued_at: asNullableText(row.invoice_issued_at),
-        completed_at: asNullableText(row.completed_at),
-        updated_at: asNullableText(row.updated_at),
-        invoice_amount: asNullablePositiveNumber(row.invoice_amount),
-        invoice_work_description: asNullableText(row.invoice_work_description),
-        archive_bucket: asNullableText(row.invoice_archive_bucket) || getArchiveBucketName(),
-        archive_path: archivePath,
+      if (!requestId) return []
+      const storeId = asText(row.store_id)
+      const storeName = asText(row.store_name)
+      const title = toMaintenanceTitle(row)
+      const updatedAt = asNullableText(row.updated_at)
+      const completedAt = asNullableText(row.completed_at)
+      const invoiceAmount = asNullablePositiveNumber(row.invoice_amount)
+      const requestFilename = asText((row as { report_pdf_filename?: unknown }).report_pdf_filename) || `work-report-${requestId}.pdf`
+      const requestArchivePath =
+        asNullableText((row as { report_archive_path?: unknown }).report_archive_path) ||
+        maintenanceRequestArchivePath(requestId, requestFilename)
+      const signedAt = asNullableText((row as { report_sent_at?: unknown }).report_sent_at)
+      const signedFilename =
+        asText((row as { signed_report_pdf_filename?: unknown }).signed_report_pdf_filename) ||
+        `signed-report-${requestId}.pdf`
+      const signedArchivePath =
+        asNullableText((row as { signed_report_archive_path?: unknown }).signed_report_archive_path) ||
+        maintenanceSignedArchivePath(requestId, signedFilename)
+      const hasInvoice =
+        asText(row.invoice_pdf_filename).length > 0 ||
+        asText(row.invoice_issued_at).length > 0 ||
+        invoiceAmount !== null
+      const invoiceFilename = asText(row.invoice_pdf_filename) || `invoice-${requestId}.pdf`
+      const invoiceArchivePath =
+        asNullableText(row.invoice_archive_path) ||
+        maintenanceInvoiceArchivePath(requestId, `invoice-${requestId}.pdf`) ||
+        maintenanceLegacyArchivePath(requestId, invoiceFilename)
+
+      const docs: CompletedDocumentRow[] = [
+        {
+          id: `maintenance-request:${requestId}`,
+          kind: 'maintenance_request',
+          request_id: requestId,
+          workflow_id: null,
+          store_id: storeId,
+          store_name: storeName,
+          title,
+          filename: requestFilename,
+          issued_at: completedAt,
+          completed_at: completedAt,
+          updated_at: updatedAt,
+          invoice_amount: null,
+          invoice_work_description: null,
+          archive_bucket:
+            asNullableText((row as { report_archive_bucket?: unknown }).report_archive_bucket) || getArchiveBucketName(),
+          archive_path: requestArchivePath,
+        },
+      ]
+
+      if (signedAt) {
+        docs.push({
+          id: `maintenance-signed:${requestId}`,
+          kind: 'maintenance_signed',
+          request_id: requestId,
+          workflow_id: null,
+          store_id: storeId,
+          store_name: storeName,
+          title,
+          filename: signedFilename,
+          issued_at: signedAt,
+          completed_at: completedAt,
+          updated_at: updatedAt,
+          invoice_amount: null,
+          invoice_work_description: null,
+          archive_bucket:
+            asNullableText((row as { signed_report_archive_bucket?: unknown }).signed_report_archive_bucket) ||
+            getArchiveBucketName(),
+          archive_path: signedArchivePath,
+        })
       }
+
+      if (hasInvoice) {
+        docs.push({
+          id: `maintenance-invoice:${requestId}`,
+          kind: 'maintenance_invoice',
+          request_id: requestId,
+          workflow_id: null,
+          store_id: storeId,
+          store_name: storeName,
+          title,
+          filename: invoiceFilename,
+          issued_at: asNullableText(row.invoice_issued_at),
+          completed_at: completedAt,
+          updated_at: updatedAt,
+          invoice_amount: invoiceAmount,
+          invoice_work_description: asNullableText(row.invoice_work_description),
+          archive_bucket: asNullableText(row.invoice_archive_bucket) || getArchiveBucketName(),
+          archive_path: invoiceArchivePath,
+        })
+      }
+
+      return docs
     })
 
     const partsDocs: CompletedDocumentRow[] = partsRows.map((row) => {

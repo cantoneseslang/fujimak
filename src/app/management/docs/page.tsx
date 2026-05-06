@@ -6,7 +6,7 @@ import Header from '@/components/Header'
 
 type CompletedDocument = {
   id: string
-  kind: 'maintenance_invoice' | 'maintenance_report' | 'parts_invoice'
+  kind: 'maintenance_request' | 'maintenance_signed' | 'maintenance_invoice' | 'parts_invoice'
   request_id: string | null
   workflow_id: string | null
   store_id: string
@@ -78,8 +78,9 @@ export default function ManagementDocsPage() {
 
   const summary = useMemo(() => {
     const invoiceCount = documents.filter((doc) => doc.kind === 'maintenance_invoice' || doc.kind === 'parts_invoice').length
-    const reportCount = documents.filter((doc) => doc.kind === 'maintenance_report').length
-    return { invoiceCount, reportCount }
+    const requestCount = documents.filter((doc) => doc.kind === 'maintenance_request').length
+    const signedCount = documents.filter((doc) => doc.kind === 'maintenance_signed').length
+    return { invoiceCount, requestCount, signedCount }
   }, [documents])
 
   const getDocumentPreviewUrl = useCallback((doc: CompletedDocument) => {
@@ -88,7 +89,7 @@ export default function ManagementDocsPage() {
     if (doc.kind === 'maintenance_invoice') {
       return `/api/mechanic/invoice/reissue?requestId=${encodeURIComponent(identifier)}&inline=1&mode=invoice&filename=${encodeURIComponent(doc.filename)}`
     }
-    if (doc.kind === 'maintenance_report') {
+    if (doc.kind === 'maintenance_request' || doc.kind === 'maintenance_signed') {
       return `/api/mechanic/invoice/reissue?requestId=${encodeURIComponent(identifier)}&inline=1&mode=report&filename=${encodeURIComponent(doc.filename)}`
     }
     return `/api/parts-order/workflows/${encodeURIComponent(identifier)}/invoice/reissue?inline=1`
@@ -103,7 +104,7 @@ export default function ManagementDocsPage() {
       const endpoint =
         doc.kind === 'parts_invoice'
           ? `/api/parts-order/workflows/${encodeURIComponent(identifier)}/invoice/reissue`
-          : `/api/mechanic/invoice/reissue?requestId=${encodeURIComponent(identifier)}&mode=${doc.kind === 'maintenance_report' ? 'report' : 'invoice'}&filename=${encodeURIComponent(doc.filename)}`
+          : `/api/mechanic/invoice/reissue?requestId=${encodeURIComponent(identifier)}&mode=${doc.kind === 'maintenance_invoice' ? 'invoice' : 'report'}&filename=${encodeURIComponent(doc.filename)}`
       const res = await fetch(endpoint, { cache: 'no-store' })
       if (!res.ok) {
         const json = (await res.json().catch(() => ({}))) as { error?: string }
@@ -200,7 +201,8 @@ export default function ManagementDocsPage() {
           ) : null}
           {!error ? (
             <div className="px-4 py-2 text-xs text-gray-600 bg-gray-50 border-b border-gray-100">
-              Total files: {documents.length} / Invoices: {summary.invoiceCount} / Reports: {summary.reportCount}
+              Total files: {documents.length} / Invoices: {summary.invoiceCount} / Requests: {summary.requestCount} /
+              Signed: {summary.signedCount}
             </div>
           ) : null}
           {!error && isLoading ? <div className="px-4 py-4 text-sm text-gray-500">Loading documents...</div> : null}
@@ -224,8 +226,10 @@ export default function ManagementDocsPage() {
                         <p className="mt-0.5 truncate text-xs text-gray-500">
                           {doc.kind === 'maintenance_invoice'
                             ? 'Maintenance Invoice'
-                            : doc.kind === 'maintenance_report'
-                              ? 'Maintenance Report'
+                            : doc.kind === 'maintenance_request'
+                              ? 'Maintenance Request'
+                              : doc.kind === 'maintenance_signed'
+                                ? 'Client Signed Report'
                               : 'Parts Invoice'}{' '}
                           · {identifier}
                         </p>

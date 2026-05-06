@@ -6,6 +6,12 @@ import { explainSmtpFailure } from '@/lib/smtpExplainError'
 import { buildMechanicWorkReportPdf } from '@/lib/mechanicWorkReportPdf'
 import type { MaintenanceRequestRecord } from '@/lib/maintenance'
 import { buildMaintenanceReportFormState, serializeMaintenanceReportForm } from '@/lib/maintenanceReportForm'
+import {
+  getArchiveBucketName,
+  maintenanceRequestArchivePath,
+  maintenanceSignedArchivePath,
+  uploadArchivedPdf,
+} from '@/lib/documentArchiveStorage'
 
 export const runtime = 'nodejs'
 
@@ -248,6 +254,30 @@ export async function POST(request: NextRequest) {
       'pdf_build'
     )
     const filename = `${reportNo}.pdf`
+    const hasSignature = signatureDataUrl.length > 0
+    const canonicalFilename = requestId
+      ? hasSignature
+        ? `signed-report-${requestId}.pdf`
+        : `work-report-${requestId}.pdf`
+      : filename
+    const archivePath = requestId
+      ? hasSignature
+        ? maintenanceSignedArchivePath(requestId, canonicalFilename)
+        : maintenanceRequestArchivePath(requestId, canonicalFilename)
+      : ''
+    let archiveSaved = false
+    if (requestId && archivePath) {
+      try {
+        await uploadArchivedPdf({
+          supabase: getSupabaseAdmin(),
+          objectPath: archivePath,
+          buffer: Buffer.from(pdfBuffer),
+        })
+        archiveSaved = true
+      } catch {
+        archiveSaved = false
+      }
+    }
 
     const targetEmail = customerEmailFromBody || normalizeEmail(record.requested_email)
     let emailSent = false
@@ -334,6 +364,12 @@ export async function POST(request: NextRequest) {
           status: nextStatus,
           updated_at: nowIso,
           mechanic_report_snapshot: serializeMaintenanceReportForm(mergedReportForm),
+          report_archive_bucket: archiveSaved && !hasSignature ? getArchiveBucketName() : null,
+          report_archive_path: archiveSaved && !hasSignature ? archivePath : null,
+          report_pdf_filename: !hasSignature ? canonicalFilename : null,
+          signed_report_archive_bucket: archiveSaved && hasSignature ? getArchiveBucketName() : null,
+          signed_report_archive_path: archiveSaved && hasSignature ? archivePath : null,
+          signed_report_pdf_filename: hasSignature ? canonicalFilename : null,
         }
         if (nextStatus !== 'completed') {
           patch.completed_at = null

@@ -3,7 +3,10 @@ import type { MaintenanceRequestRecord } from '@/lib/maintenance'
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin'
 import { buildMechanicWorkReportPdf } from '@/lib/mechanicWorkReportPdf'
 import {
+  maintenanceLegacyArchivePath,
   maintenanceInvoiceArchivePath,
+  maintenanceRequestArchivePath,
+  maintenanceSignedArchivePath,
   tryDownloadArchivedPdf,
   uploadArchivedPdf,
 } from '@/lib/documentArchiveStorage'
@@ -69,21 +72,29 @@ export async function GET(request: NextRequest) {
     const filename =
       requestedFilename ||
       (useInvoice ? asText(record.invoice_pdf_filename) || `invoice-${requestId}.pdf` : `work-report-${requestId}.pdf`)
-    const archivedPath = maintenanceInvoiceArchivePath(requestId, filename)
-    const archivedBuffer = await tryDownloadArchivedPdf({
-      supabase,
-      objectPath: archivedPath,
-    })
-    if (archivedBuffer) {
-      return new NextResponse(new Uint8Array(archivedBuffer), {
-        status: 200,
-        headers: {
-          'Content-Type': 'application/pdf',
-          'Content-Disposition': `${dispositionType}; filename="${filename}"`,
-          'Cache-Control': 'no-store',
-          'X-Archive-Hit': '1',
-        },
+    const mode = useInvoice ? 'invoice' : filename.startsWith('signed-report-') ? 'signed' : 'request'
+    const archiveCandidates =
+      mode === 'invoice'
+        ? [maintenanceInvoiceArchivePath(requestId, filename), maintenanceLegacyArchivePath(requestId, filename)]
+        : mode === 'signed'
+          ? [maintenanceSignedArchivePath(requestId, filename), maintenanceLegacyArchivePath(requestId, filename)]
+          : [maintenanceRequestArchivePath(requestId, filename), maintenanceLegacyArchivePath(requestId, filename)]
+    for (const archivedPath of archiveCandidates) {
+      const archivedBuffer = await tryDownloadArchivedPdf({
+        supabase,
+        objectPath: archivedPath,
       })
+      if (archivedBuffer) {
+        return new NextResponse(new Uint8Array(archivedBuffer), {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': `${dispositionType}; filename="${filename}"`,
+            'Cache-Control': 'no-store',
+            'X-Archive-Hit': '1',
+          },
+        })
+      }
     }
 
     const reportNo =
@@ -118,7 +129,12 @@ export async function GET(request: NextRequest) {
     try {
       await uploadArchivedPdf({
         supabase,
-        objectPath: archivedPath,
+        objectPath:
+          mode === 'invoice'
+            ? maintenanceInvoiceArchivePath(requestId, filename)
+            : mode === 'signed'
+              ? maintenanceSignedArchivePath(requestId, filename)
+              : maintenanceRequestArchivePath(requestId, filename),
         buffer: Buffer.from(pdfBuffer),
       })
     } catch {

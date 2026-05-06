@@ -43,6 +43,18 @@ export async function ensureArchiveBucket(supabase: ReturnType<typeof getSupabas
 }
 
 export function maintenanceInvoiceArchivePath(requestId: string, filename: string) {
+  return `maintenance/invoices/${sanitizeSegment(requestId)}/${sanitizeSegment(filename)}`
+}
+
+export function maintenanceRequestArchivePath(requestId: string, filename: string) {
+  return `maintenance/requests/${sanitizeSegment(requestId)}/${sanitizeSegment(filename)}`
+}
+
+export function maintenanceSignedArchivePath(requestId: string, filename: string) {
+  return `maintenance/signed/${sanitizeSegment(requestId)}/${sanitizeSegment(filename)}`
+}
+
+export function maintenanceLegacyArchivePath(requestId: string, filename: string) {
   return `maintenance/${sanitizeSegment(requestId)}/${sanitizeSegment(filename)}`
 }
 

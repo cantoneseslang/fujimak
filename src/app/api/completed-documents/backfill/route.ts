@@ -7,6 +7,8 @@ import { buildPartsOrderPdf } from '@/lib/partsOrderPdf'
 import { buildMaintenanceReportFormState } from '@/lib/maintenanceReportForm'
 import {
   getArchiveBucketName,
+  maintenanceRequestArchivePath,
+  maintenanceSignedArchivePath,
   maintenanceInvoiceArchivePath,
   partsInvoiceArchivePath,
   tryDownloadArchivedPdf,
@@ -92,7 +94,7 @@ export async function POST() {
     const { data: maintenanceRows, error: maintenanceError } = await supabase
       .from('maintenance_requests')
       .select('*')
-      .eq('status', 'completed')
+      .in('status', ['in_progress', 'completed'])
       .order('updated_at', { ascending: false })
       .limit(500)
     if (maintenanceError) throw maintenanceError
@@ -104,53 +106,108 @@ export async function POST() {
         continue
       }
 
-      const invoiceAmount = asPositiveNumber(row.invoice_amount)
-      const isInvoice = invoiceAmount !== null
-      const filename = isInvoice
-        ? asText(row.invoice_pdf_filename) || `invoice-${requestId}.pdf`
-        : `work-report-${requestId}.pdf`
-      const archivePath = asText(row.invoice_archive_path) || maintenanceInvoiceArchivePath(requestId, filename)
-      const exists = await tryDownloadArchivedPdf({ supabase, objectPath: archivePath })
-      if (exists) continue
-
       const record = row as unknown as MaintenanceRequestRecord
       const mergedReportForm = buildMaintenanceReportFormState(record, row.mechanic_report_snapshot ?? undefined)
-      const reportNo = filename.replace(/\.pdf$/i, '') || `${isInvoice ? 'INV' : 'WR'}-${requestId}`
+      const completedRaw = asText(row.completed_at) || asText(row.updated_at)
+      const completedIssuedAtText = (() => {
+        if (!completedRaw) return new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })
+        const date = new Date(completedRaw)
+        if (Number.isNaN(date.getTime())) return new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })
+        return date.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })
+      })()
+
+      const requestFilename = asText((row as { report_pdf_filename?: unknown }).report_pdf_filename) || `work-report-${requestId}.pdf`
+      const requestArchivePath =
+        asText((row as { report_archive_path?: unknown }).report_archive_path) ||
+        maintenanceRequestArchivePath(requestId, requestFilename)
+      const requestExists = await tryDownloadArchivedPdf({ supabase, objectPath: requestArchivePath })
+      if (!requestExists) {
+        const requestPdfBuffer = await buildMechanicWorkReportPdf({
+          request: record,
+          reportNo: requestFilename.replace(/\.pdf$/i, '') || `WR-${requestId}`,
+          issuedAtText: completedIssuedAtText,
+          maintenanceReport: mergedReportForm,
+        })
+        await uploadArchivedPdf({
+          supabase,
+          objectPath: requestArchivePath,
+          buffer: Buffer.from(requestPdfBuffer),
+        })
+        await updateWithFallback('maintenance_requests', 'id', requestId, {
+          report_archive_bucket: archiveBucket,
+          report_archive_path: requestArchivePath,
+          report_pdf_filename: requestFilename,
+        })
+        maintenanceArchived += 1
+      }
+
+      const signedAtRaw = asText((row as { report_sent_at?: unknown }).report_sent_at)
+      if (signedAtRaw) {
+        const signedFilename =
+          asText((row as { signed_report_pdf_filename?: unknown }).signed_report_pdf_filename) ||
+          `signed-report-${requestId}.pdf`
+        const signedArchivePath =
+          asText((row as { signed_report_archive_path?: unknown }).signed_report_archive_path) ||
+          maintenanceSignedArchivePath(requestId, signedFilename)
+        const signedExists = await tryDownloadArchivedPdf({ supabase, objectPath: signedArchivePath })
+        if (!signedExists) {
+          const signedDate = new Date(signedAtRaw)
+          const signedIssuedAtText = Number.isNaN(signedDate.getTime())
+            ? completedIssuedAtText
+            : signedDate.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })
+          const signedPdfBuffer = await buildMechanicWorkReportPdf({
+            request: record,
+            reportNo: signedFilename.replace(/\.pdf$/i, '') || `WS-${requestId}`,
+            issuedAtText: signedIssuedAtText,
+            maintenanceReport: mergedReportForm,
+          })
+          await uploadArchivedPdf({
+            supabase,
+            objectPath: signedArchivePath,
+            buffer: Buffer.from(signedPdfBuffer),
+          })
+          await updateWithFallback('maintenance_requests', 'id', requestId, {
+            signed_report_archive_bucket: archiveBucket,
+            signed_report_archive_path: signedArchivePath,
+            signed_report_pdf_filename: signedFilename,
+          })
+          maintenanceArchived += 1
+        }
+      }
+
+      const invoiceAmount = asPositiveNumber(row.invoice_amount)
+      const hasInvoice = invoiceAmount !== null || asText(row.invoice_issued_at).length > 0
+      if (!hasInvoice) continue
+      const invoiceFilename = asText(row.invoice_pdf_filename) || `invoice-${requestId}.pdf`
+      const invoiceArchivePath = asText(row.invoice_archive_path) || maintenanceInvoiceArchivePath(requestId, `invoice-${requestId}.pdf`)
+      const invoiceExists = await tryDownloadArchivedPdf({ supabase, objectPath: invoiceArchivePath })
+      if (invoiceExists) continue
       const issuedAtText = (() => {
-        const raw = isInvoice ? asText(row.invoice_issued_at) : asText(row.completed_at) || asText(row.updated_at)
+        const raw = asText(row.invoice_issued_at) || completedRaw
         if (!raw) return new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })
         const date = new Date(raw)
         if (Number.isNaN(date.getTime())) return new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })
         return date.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })
       })()
 
-      const pdfBuffer = isInvoice
-        ? await buildMechanicWorkReportPdf({
-            request: record,
-            reportNo,
-            issuedAtText,
-            reportTitle: 'INVOICE',
-            invoiceAmount: invoiceAmount ?? undefined,
-            invoiceWorkDescription: asText(row.invoice_work_description),
-            maintenanceReport: mergedReportForm,
-          })
-        : await buildMechanicWorkReportPdf({
-            request: record,
-            reportNo,
-            issuedAtText,
-            maintenanceReport: mergedReportForm,
-          })
+      const pdfBuffer = await buildMechanicWorkReportPdf({
+        request: record,
+        reportNo: invoiceFilename.replace(/\.pdf$/i, '') || `INV-${requestId}`,
+        issuedAtText,
+        reportTitle: 'INVOICE',
+        invoiceAmount: invoiceAmount ?? undefined,
+        invoiceWorkDescription: asText(row.invoice_work_description),
+        maintenanceReport: mergedReportForm,
+      })
       await uploadArchivedPdf({
         supabase,
-        objectPath: archivePath,
+        objectPath: invoiceArchivePath,
         buffer: Buffer.from(pdfBuffer),
       })
-      if (isInvoice) {
-        await updateWithFallback('maintenance_requests', 'id', requestId, {
-          invoice_archive_bucket: archiveBucket,
-          invoice_archive_path: archivePath,
-        })
-      }
+      await updateWithFallback('maintenance_requests', 'id', requestId, {
+        invoice_archive_bucket: archiveBucket,
+        invoice_archive_path: invoiceArchivePath,
+      })
       maintenanceArchived += 1
     }
 

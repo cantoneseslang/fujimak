@@ -409,7 +409,9 @@
     "smtpTestUnknownSummary": "サーバーからの応答を正しく解釈できませんでした。",
     "smtpTestSuccessFallback": "テスト送信に成功しました。",
     "smtpTestMissingCredentialsTitle": "SMTP Host または SMTP User が必要です",
-    "smtpTestMissingCredentialsSummary": "画面上は入力済みに見えても、ブラウザの自動入力だけではフォームの状態が更新されないことがあります。Host と User の欄を一度タップするか、1文字入力して消すなどしてから「送信テスト」を押してください。"
+    "smtpTestMissingCredentialsSummary": "画面上は入力済みに見えても、ブラウザの自動入力だけではフォームの状態が更新されないことがあります。Host と User の欄を一度タップするか、1文字入力して消すなどしてから「送信テスト」を押してください。",
+    "smtpTestNonJsonSummary": "サーバーが JSON ではない応答を返しました（HTTP {status}）。ページを再読み込みするか、再度ログインしてください。",
+    "smtpTestNetworkSummary": "ブラウザ側でリクエストが完了できませんでした（オフラインやブロックなど）。通信を確認して再度お試しください。"
   },
   "areas": {
     "all-area": "全域",

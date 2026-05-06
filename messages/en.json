@@ -409,7 +409,9 @@
     "smtpTestUnknownSummary": "Could not parse the server response.",
     "smtpTestSuccessFallback": "Test email sent successfully.",
     "smtpTestMissingCredentialsTitle": "SMTP host or user required",
-    "smtpTestMissingCredentialsSummary": "If fields look filled but the test still fails, your browser may have autofilled the inputs without updating the form—tap inside Host and User once, or type a character and delete it. Then try Send test again."
+    "smtpTestMissingCredentialsSummary": "If fields look filled but the test still fails, your browser may have autofilled the inputs without updating the form—tap inside Host and User once, or type a character and delete it. Then try Send test again.",
+    "smtpTestNonJsonSummary": "The server returned a response that was not JSON (HTTP {status}). Reload the page or sign in again.",
+    "smtpTestNetworkSummary": "The browser could not complete the request (network error or blocked request). Check connectivity and try again."
   },
   "areas": {
     "all-area": "All Areas",

@@ -409,7 +409,9 @@
     "smtpTestUnknownSummary": "無法解析伺服器回應。",
     "smtpTestSuccessFallback": "測試郵件已成功發送。",
     "smtpTestMissingCredentialsTitle": "需要 SMTP 主機與使用者",
-    "smtpTestMissingCredentialsSummary": "欄位看起來已填妥但無法送出時，可能是瀏覽器自動填入未同步到表單。請各點一次「主機」與「使用者」欄位，或輸入再刪除一個字元後再按發送測試。"
+    "smtpTestMissingCredentialsSummary": "欄位看起來已填妥但無法送出時，可能是瀏覽器自動填入未同步到表單。請各點一次「主機」與「使用者」欄位，或輸入再刪除一個字元後再按發送測試。",
+    "smtpTestNonJsonSummary": "伺服器回應不是 JSON（HTTP {status}）。請重新整理頁面或重新登入。",
+    "smtpTestNetworkSummary": "瀏覽器無法完成請求（網路錯誤或遭到阻擋）。請檢查連線後再試。"
   },
   "areas": {
     "all-area": "全域",

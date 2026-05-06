@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, useEffect, useRef } from 'react'
+import { useMemo, useState, useEffect, useRef, useLayoutEffect } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import { Globe, LogOut, Mail, Plus, Trash2, Save, Send } from 'lucide-react'
 import Header from '@/components/Header'
@@ -50,6 +50,14 @@ type SmtpTestFeedback =
   | { type: 'success'; message: string; recipient?: string }
   | { type: 'error'; explanation: SmtpTestExplanation; step?: string }
 
+type SmtpTestJsonBody = {
+  ok?: boolean
+  explanation?: SmtpTestExplanation
+  step?: string
+  message?: string
+  recipient?: string
+}
+
 export default function SettingsPage() {
   const [vendors, setVendors] = useState<Vendor[]>(DEFAULT_VENDORS)
   const [mechanics, setMechanics] = useState<MechanicSetting[]>([])
@@ -72,6 +80,7 @@ export default function SettingsPage() {
   const smtpUserRef = useRef<HTMLInputElement>(null)
   const smtpPassRef = useRef<HTMLInputElement>(null)
   const smtpFromRef = useRef<HTMLInputElement>(null)
+  const smtpToastAnchorRef = useRef<HTMLDivElement>(null)
   const t = useTranslations('settings')
   const nextIntlLocale = useLocale()
   const uiLocale: Locale = locales.includes(nextIntlLocale as Locale)
@@ -121,6 +130,11 @@ export default function SettingsPage() {
     () => Object.keys(duplicateMechanicEmailById).length > 0,
     [duplicateMechanicEmailById]
   )
+
+  useLayoutEffect(() => {
+    if (!smtpTestFeedback) return
+    smtpToastAnchorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  }, [smtpTestFeedback])
 
   useEffect(() => {
     const loadSettingsBootstrap = async () => {
@@ -454,12 +468,25 @@ export default function SettingsPage() {
           locale: uiLocale,
         }),
       })
-      const json = (await res.json()) as {
-        ok?: boolean
-        explanation?: SmtpTestExplanation
-        step?: string
-        message?: string
-        recipient?: string
+      const rawText = await res.text()
+      let json: SmtpTestJsonBody | null = null
+      try {
+        json = rawText ? (JSON.parse(rawText) as SmtpTestJsonBody) : null
+      } catch {
+        json = null
+      }
+      if (!json) {
+        setSmtpTestFeedback({
+          type: 'error',
+          explanation: {
+            title: t('smtpTestUnknownTitle'),
+            summary: t('smtpTestNonJsonSummary', { status: res.status }),
+            actions: [],
+            technical: rawText.slice(0, 4000),
+          },
+          step: String(res.status),
+        })
+        return
       }
       if (!res.ok || !json.ok) {
         const explanation =
@@ -478,14 +505,15 @@ export default function SettingsPage() {
         message: json.message ?? t('smtpTestSuccessFallback'),
         recipient: json.recipient,
       })
-    } catch {
+    } catch (err) {
+      const technical = err instanceof Error ? err.message : String(err)
       setSmtpTestFeedback({
         type: 'error',
         explanation: {
           title: t('smtpTestUnknownTitle'),
-          summary: t('smtpTestUnknownSummary'),
+          summary: t('smtpTestNetworkSummary'),
           actions: [],
-          technical: 'Network error',
+          technical,
         },
       })
     } finally {
@@ -741,10 +769,10 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
+    <div className="min-h-screen bg-gray-50">
       <Header showBack title={t('title')} />
       
-      <main className="px-4 py-6 space-y-6">
+      <main className="px-4 py-6 space-y-6" style={{ paddingBottom: '320px' }}>
         <section className="rounded-xl border border-gray-200 bg-white p-4">
           <button
             type="button"
@@ -1071,7 +1099,10 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        <div className="flex w-full max-w-xl mx-auto flex-col gap-3 px-2 sm:flex-row sm:justify-center">
+        <div
+          ref={smtpToastAnchorRef}
+          className="flex w-full max-w-xl mx-auto flex-col gap-3 px-2 sm:flex-row sm:justify-center"
+        >
           <button
             type="button"
             onClick={saveAllSettings}
@@ -1116,34 +1147,56 @@ export default function SettingsPage() {
             )}
           </button>
         </div>
-        {smtpTestFeedback?.type === 'success' ? (
-          <div className="mx-auto mt-3 max-w-xl rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-900">
-            <p className="font-semibold">{smtpTestFeedback.message}</p>
-            {smtpTestFeedback.recipient ? (
-              <p className="mt-1 text-xs text-emerald-800">{smtpTestFeedback.recipient}</p>
-            ) : null}
-          </div>
-        ) : null}
-        {smtpTestFeedback?.type === 'error' ? (
-          <div className="mx-auto mt-3 max-w-xl rounded-lg border border-red-200 bg-red-50 px-3 py-3 text-sm text-red-950">
-            <p className="font-semibold text-red-900">{smtpTestFeedback.explanation.title}</p>
-            {smtpTestFeedback.step ? (
-              <p className="mt-1 text-xs font-medium uppercase tracking-wide text-red-700">
-                step: {smtpTestFeedback.step}
-              </p>
-            ) : null}
-            <p className="mt-2 text-red-900">{smtpTestFeedback.explanation.summary}</p>
-            {smtpTestFeedback.explanation.actions.length > 0 ? (
-              <ul className="mt-2 list-disc space-y-1 pl-5 text-red-900">
-                {smtpTestFeedback.explanation.actions.map((line, idx) => (
-                  <li key={idx}>{line}</li>
-                ))}
-              </ul>
-            ) : null}
-            <details className="mt-3 text-xs text-red-800">
-              <summary className="cursor-pointer font-medium">{t('smtpTestTechnicalSummary')}</summary>
-              <pre className="mt-2 whitespace-pre-wrap break-all font-mono">{smtpTestFeedback.explanation.technical}</pre>
-            </details>
+        {smtpTestFeedback ? (
+          <div
+            role="alert"
+            aria-live="assertive"
+            className={`fixed left-3 right-3 z-[60] max-h-[45vh] overflow-y-auto rounded-xl border p-4 text-sm shadow-xl ${
+              smtpTestFeedback.type === 'success'
+                ? 'bottom-[calc(5.5rem+env(safe-area-inset-bottom,0px))] border-emerald-300 bg-emerald-50 text-emerald-950'
+                : 'bottom-[calc(5.5rem+env(safe-area-inset-bottom,0px))] border-red-300 bg-red-50 text-red-950'
+            }`}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                {smtpTestFeedback.type === 'success' ? (
+                  <>
+                    <p className="font-bold">{smtpTestFeedback.message}</p>
+                    {smtpTestFeedback.recipient ? (
+                      <p className="mt-1 text-xs opacity-90">{smtpTestFeedback.recipient}</p>
+                    ) : null}
+                  </>
+                ) : (
+                  <>
+                    <p className="font-bold">{smtpTestFeedback.explanation.title}</p>
+                    {smtpTestFeedback.step ? (
+                      <p className="mt-1 text-xs font-semibold uppercase tracking-wide opacity-80">
+                        step: {smtpTestFeedback.step}
+                      </p>
+                    ) : null}
+                    <p className="mt-2 text-sm opacity-95">{smtpTestFeedback.explanation.summary}</p>
+                    {smtpTestFeedback.explanation.actions.length > 0 ? (
+                      <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
+                        {smtpTestFeedback.explanation.actions.map((line, idx) => (
+                          <li key={idx}>{line}</li>
+                        ))}
+                      </ul>
+                    ) : null}
+                    <details className="mt-3 text-xs opacity-90">
+                      <summary className="cursor-pointer font-medium">{t('smtpTestTechnicalSummary')}</summary>
+                      <pre className="mt-2 whitespace-pre-wrap break-all font-mono">{smtpTestFeedback.explanation.technical}</pre>
+                    </details>
+                  </>
+                )}
+              </div>
+              <button
+                type="button"
+                className="shrink-0 rounded-lg bg-black/10 px-3 py-1 text-xs font-semibold"
+                onClick={() => setSmtpTestFeedback(null)}
+              >
+                OK
+              </button>
+            </div>
           </div>
         ) : null}
 

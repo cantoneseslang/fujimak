@@ -46,7 +46,10 @@ const getRecipients = async () => {
   )
   if (partsRecipients.length > 0) return partsRecipients
 
-  const { data: emails } = await supabase.from('notification_emails').select('email')
+  const { data: emails } = await supabase
+    .from('notification_emails')
+    .select('email')
+    .eq('is_active', true)
   const dbRecipients = Array.from(
     new Set(
       (emails ?? [])

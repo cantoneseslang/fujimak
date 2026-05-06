@@ -111,7 +111,15 @@ export default function SettingsPage() {
       try {
         const response = await fetch('/api/settings/vendors', { cache: 'no-store' })
         if (!response.ok) throw new Error(`Failed to load vendors (${response.status})`)
-        const json = (await response.json()) as { vendors?: { id: string; email: string }[] }
+        const json = (await response.json()) as {
+          vendors?: Array<{
+            id: string
+            email: string
+            display_name?: string | null
+            phone?: string | null
+            is_active?: boolean
+          }>
+        }
         const data = json.vendors ?? []
 
         if (data.length > 0) {
@@ -119,10 +127,13 @@ export default function SettingsPage() {
           setVendors(
             data.map((entry, index) => ({
               id: entry.id,
-              name: `Vendor ${index + 1}`,
-              email: entry.email,
-              phone: '',
-              is_active: true,
+              name:
+                typeof entry.display_name === 'string' && entry.display_name.trim().length > 0
+                  ? entry.display_name.trim()
+                  : `Vendor ${index + 1}`,
+              email: (entry.email || '').trim().toLowerCase(),
+              phone: typeof entry.phone === 'string' ? entry.phone : '',
+              is_active: entry.is_active !== false,
             }))
           )
         }
@@ -367,18 +378,53 @@ export default function SettingsPage() {
       localStorage.setItem('vendors', JSON.stringify(cleaned))
       setVendors(cleaned)
 
+      const vendorsPayload = cleaned
+        .filter((vendor) => vendor.email.trim().length > 0)
+        .map((vendor) => ({
+          email: normalizeEmail(vendor.email),
+          name: vendor.name.trim(),
+          phone: vendor.phone.trim(),
+          is_active: vendor.is_active,
+        }))
+
       const activeEmails = cleaned
-        .filter((vendor) => vendor.is_active && vendor.email.length > 0)
-        .map((vendor) => vendor.email)
+        .filter((vendor) => vendor.is_active && vendor.email.trim().length > 0)
+        .map((vendor) => normalizeEmail(vendor.email))
 
       const vendorResponse = await fetch('/api/settings/vendors', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ emails: activeEmails }),
+        body: JSON.stringify({ vendors: vendorsPayload }),
       })
       if (!vendorResponse.ok) {
         const json = (await vendorResponse.json().catch(() => ({}))) as { error?: string }
         throw new Error(json.error || `Failed to save vendors (${vendorResponse.status})`)
+      }
+
+      const reloadVendorsRes = await fetch('/api/settings/vendors', { cache: 'no-store' })
+      if (reloadVendorsRes.ok) {
+        const reloadJson = (await reloadVendorsRes.json()) as {
+          vendors?: Array<{
+            id: string
+            email: string
+            display_name?: string | null
+            phone?: string | null
+            is_active?: boolean
+          }>
+        }
+        const vRows = reloadJson.vendors ?? []
+        const remapped = vRows.map((entry, index) => ({
+          id: entry.id,
+          name:
+            typeof entry.display_name === 'string' && entry.display_name.trim().length > 0
+              ? entry.display_name.trim()
+              : `Vendor ${index + 1}`,
+          email: (entry.email || '').trim().toLowerCase(),
+          phone: typeof entry.phone === 'string' ? entry.phone : '',
+          is_active: entry.is_active !== false,
+        }))
+        setVendors(remapped)
+        localStorage.setItem('vendors', JSON.stringify(remapped))
       }
 
       const normalizedPartsRecipientEmail = normalizeEmail(partsOrderRecipientEmail)

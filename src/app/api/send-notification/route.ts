@@ -122,7 +122,10 @@ async function resolveRecipients(options: {
   // Row missing (partial migration): treat as enabled. Only skip when explicitly false.
   if (setting && setting.enabled === false) return []
 
-  const { data: emails } = await supabase.from('notification_emails').select('email')
+  const { data: emails } = await supabase
+    .from('notification_emails')
+    .select('email')
+    .eq('is_active', true)
   const settingsRecipients = normalizeRecipients((emails ?? []).map((entry) => entry?.email))
   if (settingsRecipients.length > 0) return settingsRecipients
 

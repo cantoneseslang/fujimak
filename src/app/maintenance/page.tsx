@@ -34,7 +34,7 @@ import { getStoreMachines } from '@/lib/storeMachines'
 
 type Step = 1 | 2 | 3 | 4 | 5 | 6
 type MediaFile = { url: string; type: 'image' }
-type NotificationRecipient = { id: string; email: string }
+type NotificationRecipient = { id: string; email: string; is_active?: boolean }
 
 function normalizeFullWidthDigits(value: string) {
   return value.replace(/[０-９]/g, (digit) => String.fromCharCode(digit.charCodeAt(0) - 0xfee0))
@@ -130,7 +130,12 @@ export default function MaintenancePage() {
         if (vendors.length > 0) {
           setNotificationRecipients(
             vendors
-              .filter((vendor) => typeof vendor.email === 'string' && vendor.email.trim().length > 0)
+              .filter(
+                (vendor) =>
+                  typeof vendor.email === 'string' &&
+                  vendor.email.trim().length > 0 &&
+                  vendor.is_active !== false
+              )
               .map((vendor) => ({ id: vendor.id, email: vendor.email.trim() }))
           )
         }

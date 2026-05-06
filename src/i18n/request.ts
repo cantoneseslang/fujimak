@@ -1,7 +1,6 @@
 import { getRequestConfig } from 'next-intl/server'
 import { cookies, headers } from 'next/headers'
-import { FUJIMAK_REQUEST_LOCALE_HEADER, locales, type Locale } from './config'
-import { negotiateLocaleFromAcceptLanguage } from './negotiateLocale'
+import { FUJIMAK_REQUEST_LOCALE_HEADER, defaultLocale, locales, type Locale } from './config'
 
 export default getRequestConfig(async () => {
   const headerStore = await headers()
@@ -16,7 +15,7 @@ export default getRequestConfig(async () => {
   } else if (cookieLocale && locales.includes(cookieLocale as Locale)) {
     locale = cookieLocale as Locale
   } else {
-    locale = negotiateLocaleFromAcceptLanguage(headerStore.get('accept-language'))
+    locale = defaultLocale
   }
 
   return {

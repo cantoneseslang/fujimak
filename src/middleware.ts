@@ -5,8 +5,7 @@ import {
   ensureAccessForIdentifier,
   normalizeIdentifier,
 } from "@/lib/accessPolicy";
-import { locales, FUJIMAK_REQUEST_LOCALE_HEADER, type Locale } from "@/i18n/config";
-import { negotiateLocaleFromAcceptLanguage } from "@/i18n/negotiateLocale";
+import { locales, defaultLocale, FUJIMAK_REQUEST_LOCALE_HEADER, type Locale } from "@/i18n/config";
 
 const TEST_CODE_COOKIE = "fujimak_test_code";
 const LOCALE_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
@@ -72,7 +71,8 @@ async function withTimeout<T>(task: Promise<T>, ms: number) {
 function resolveLocaleFromRequest(request: NextRequest): Locale {
   const raw = request.cookies.get("locale")?.value;
   if (raw && locales.includes(raw as Locale)) return raw as Locale;
-  return negotiateLocaleFromAcceptLanguage(request.headers.get("accept-language"));
+  /* Do not infer from Accept-Language — it caused zh/en flips when Cookie was unset vs RSC timing. */
+  return defaultLocale;
 }
 
 /** Same locale the middleware will persist on Set-Cookie — forwarded so RSC/next-intl agree on the same request. */

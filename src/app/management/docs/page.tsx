@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Archive, Download, Search } from 'lucide-react'
+import { Archive, ChevronRight, Search } from 'lucide-react'
 import Header from '@/components/Header'
 
 type CompletedDocument = {
@@ -29,12 +29,11 @@ const KIND_FOLDER_MAP: Record<CompletedDocument['kind'], string> = {
   parts_invoice: 'parts/invoices',
 }
 
-function kindLabel(kind: CompletedDocument['kind']) {
-  if (kind === 'maintenance_request') return 'Maintenance Request'
-  if (kind === 'maintenance_signed') return 'Client Signed Report'
-  if (kind === 'maintenance_invoice') return 'Maintenance Invoice'
-  return 'Parts Invoice'
-}
+const MAINTENANCE_FOLDERS = [
+  { folder: 'maintenance/requests', slug: 'maintenance_request', label: 'Maintenance Request' },
+  { folder: 'maintenance/signed', slug: 'maintenance_signed', label: 'Client Signed Report' },
+  { folder: 'maintenance/invoices', slug: 'maintenance_invoice', label: 'Maintenance Invoice' },
+] as const
 
 export default function ManagementDocsPage() {
   const [documents, setDocuments] = useState<CompletedDocument[]>([])
@@ -43,7 +42,6 @@ export default function ManagementDocsPage() {
   const [warning, setWarning] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [actionMessage, setActionMessage] = useState<string | null>(null)
-  const [downloadingDocumentId, setDownloadingDocumentId] = useState<string | null>(null)
   const [isBackfilling, setIsBackfilling] = useState(false)
 
   const loadDocuments = useCallback(async () => {
@@ -101,13 +99,6 @@ export default function ManagementDocsPage() {
   }, [documents])
 
   const groupedDocuments = useMemo(() => {
-    const folderOrder = new Map<string, number>([
-      ['maintenance/requests', 1],
-      ['maintenance/signed', 2],
-      ['maintenance/invoices', 3],
-      ['parts/invoices', 4],
-    ])
-
     const map = new Map<string, CompletedDocument[]>()
     for (const doc of filteredDocuments) {
       const folder = KIND_FOLDER_MAP[doc.kind] || `fallback/${doc.kind}`
@@ -115,61 +106,12 @@ export default function ManagementDocsPage() {
       map.get(folder)?.push(doc)
     }
 
-    return [...map.entries()]
-      .sort((a, b) => {
-        const aRank = folderOrder.get(a[0]) ?? 999
-        const bRank = folderOrder.get(b[0]) ?? 999
-        if (aRank !== bRank) return aRank - bRank
-        return a[0].localeCompare(b[0])
-      })
-      .map(([folder, docs]) => ({ folder, docs }))
+    return MAINTENANCE_FOLDERS.map(({ folder, slug, label }) => ({
+      folder,
+      heading: `${slug} | ${label}`,
+      docs: map.get(folder) ?? [],
+    }))
   }, [filteredDocuments])
-
-  const getDocumentPreviewUrl = useCallback((doc: CompletedDocument) => {
-    const identifier = doc.request_id || doc.workflow_id || ''
-    if (!identifier) return ''
-    if (doc.kind === 'maintenance_invoice') {
-      return `/api/mechanic/invoice/reissue?requestId=${encodeURIComponent(identifier)}&inline=1&mode=invoice&filename=${encodeURIComponent(doc.filename)}`
-    }
-    if (doc.kind === 'maintenance_request' || doc.kind === 'maintenance_signed') {
-      return `/api/mechanic/invoice/reissue?requestId=${encodeURIComponent(identifier)}&inline=1&mode=report&filename=${encodeURIComponent(doc.filename)}`
-    }
-    return `/api/parts-order/workflows/${encodeURIComponent(identifier)}/invoice/reissue?inline=1`
-  }, [])
-
-  const handleDownload = useCallback(async (doc: CompletedDocument) => {
-    const identifier = doc.request_id || doc.workflow_id || ''
-    if (!identifier) return
-    setActionMessage(null)
-    setDownloadingDocumentId(doc.id)
-    try {
-      const endpoint =
-        doc.kind === 'parts_invoice'
-          ? `/api/parts-order/workflows/${encodeURIComponent(identifier)}/invoice/reissue`
-          : `/api/mechanic/invoice/reissue?requestId=${encodeURIComponent(identifier)}&mode=${doc.kind === 'maintenance_invoice' ? 'invoice' : 'report'}&filename=${encodeURIComponent(doc.filename)}`
-      const res = await fetch(endpoint, { cache: 'no-store' })
-      if (!res.ok) {
-        const json = (await res.json().catch(() => ({}))) as { error?: string }
-        throw new Error(json.error || 'Failed to download PDF')
-      }
-      const blob = await res.blob()
-      const disposition = res.headers.get('Content-Disposition')
-      const matched = disposition?.match(/filename="([^"]+)"/)
-      const filename = matched?.[1] || doc.filename || `${doc.id}.pdf`
-      const url = URL.createObjectURL(blob)
-      const anchor = document.createElement('a')
-      anchor.href = url
-      anchor.download = filename
-      anchor.rel = 'noopener'
-      anchor.click()
-      URL.revokeObjectURL(url)
-      setActionMessage(`Downloaded: ${filename}`)
-    } catch (err) {
-      setActionMessage(err instanceof Error ? err.message : 'Failed to download PDF')
-    } finally {
-      setDownloadingDocumentId(null)
-    }
-  }, [])
 
   const handleBackfill = useCallback(async () => {
     setActionMessage(null)
@@ -248,82 +190,22 @@ export default function ManagementDocsPage() {
             </div>
           ) : null}
           {!error && isLoading ? <div className="px-4 py-4 text-sm text-gray-500">Loading documents...</div> : null}
-          {!error && !isLoading && filteredDocuments.length === 0 ? (
-            <div className="px-4 py-5 text-sm text-gray-500">No completed documents found.</div>
+          {!error && !isLoading && documents.length === 0 ? (
+            <div className="px-4 py-3 text-sm text-gray-500">No completed documents in the index yet.</div>
           ) : null}
-
-          {!error && !isLoading && filteredDocuments.length > 0 ? (
-            <div className="divide-y divide-gray-100">
+          {!error && !isLoading ? (
+            <div className="divide-y divide-gray-100 px-3 py-2">
               {groupedDocuments.map((group) => (
-                <section key={group.folder} className="px-3 py-2.5">
-                  <div className="mb-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-700">
-                    {`docs/${group.folder} (${group.docs.length})`}
-                  </div>
-                  <ul className="divide-y divide-gray-100 rounded-md border border-gray-100 bg-white">
-                    {group.docs.map((doc) => {
-                      const identifier = doc.request_id || doc.workflow_id || '-'
-                      const issuedAt = doc.issued_at || doc.completed_at || doc.updated_at
-                      const previewUrl = getDocumentPreviewUrl(doc)
-                      return (
-                        <li key={doc.id} className="px-2 py-2.5">
-                          <div className="flex items-start gap-3">
-                            <div className="min-w-0 flex-1">
-                              <p className="truncate text-sm font-semibold text-gray-800">
-                                {doc.store_name || doc.store_id || '-'} · {kindLabel(doc.kind)}
-                              </p>
-                              <p className="mt-0.5 truncate text-xs text-gray-500">
-                                {doc.request_id ? `Request ID: ${identifier}` : `Workflow ID: ${identifier}`}
-                              </p>
-                              <p className="mt-0.5 truncate text-xs text-gray-500">Subject: {doc.title || '-'}</p>
-                              <p className="mt-0.5 truncate text-xs text-gray-500">File: {doc.filename}</p>
-                              <p className="mt-0.5 text-xs text-gray-500">
-                                Issued: {issuedAt ? new Date(issuedAt).toLocaleString() : '-'}
-                              </p>
-                              {doc.invoice_amount ? (
-                                <p className="mt-0.5 text-xs text-gray-600">
-                                  Amount: PHP {doc.invoice_amount.toLocaleString('en-US', { maximumFractionDigits: 2 })}
-                                </p>
-                              ) : null}
-                            </div>
-
-                            <div className="flex shrink-0 items-center gap-2">
-                              <a
-                                href={previewUrl || undefined}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="block overflow-hidden rounded-md border border-gray-200 bg-white"
-                                style={{ width: '72px', height: '102px' }}
-                              >
-                                {previewUrl ? (
-                                  <iframe
-                                    title={`pdf-preview-${doc.id}`}
-                                    src={`${previewUrl}#page=1&toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
-                                    className="h-full w-full"
-                                    loading="lazy"
-                                  />
-                                ) : (
-                                  <div className="h-full w-full flex items-center justify-center text-[10px] text-gray-500">
-                                    No PDF
-                                  </div>
-                                )}
-                              </a>
-                              <button
-                                type="button"
-                                onClick={() => void handleDownload(doc)}
-                                disabled={downloadingDocumentId === doc.id || !previewUrl}
-                                className="inline-flex items-center gap-1 rounded-md bg-zinc-900 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
-                                style={{ minWidth: '124px', minHeight: '36px' }}
-                              >
-                                <Download className="h-3 w-3" />
-                                {downloadingDocumentId === doc.id ? 'Downloading...' : 'Download PDF'}
-                              </button>
-                            </div>
-                          </div>
-                        </li>
-                      )
-                    })}
-                  </ul>
-                </section>
+                <details key={group.folder} className="group border-b border-gray-100 py-2 last:border-b-0">
+                  <summary className="flex cursor-pointer list-none items-center gap-2 rounded-md px-2 py-2 text-sm font-semibold text-gray-800 marker:hidden [&::-webkit-details-marker]:hidden">
+                    <ChevronRight className="h-4 w-4 shrink-0 text-gray-500 transition-transform group-open:rotate-90" aria-hidden />
+                    <span className="min-w-0 flex-1 truncate">{group.heading}</span>
+                    <span className="shrink-0 tabular-nums text-xs font-normal text-gray-500">({group.docs.length})</span>
+                  </summary>
+                  {group.docs.length === 0 ? (
+                    <p className="px-2 pb-2 pl-8 text-xs text-gray-500">No files in this folder.</p>
+                  ) : null}
+                </details>
               ))}
             </div>
           ) : null}

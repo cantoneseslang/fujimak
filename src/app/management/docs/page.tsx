@@ -22,14 +22,11 @@ type CompletedDocument = {
   archive_path?: string | null
 }
 
-function folderPathFromDoc(doc: CompletedDocument) {
-  const raw = (doc.archive_path || '').trim().replace(/^\/+/, '')
-  if (!raw) return `fallback/${doc.kind}`
-  const segments = raw.split('/').filter(Boolean)
-  if (segments.length >= 2) {
-    return `${segments[0]}/${segments[1]}`
-  }
-  return raw
+const KIND_FOLDER_MAP: Record<CompletedDocument['kind'], string> = {
+  maintenance_request: 'maintenance/requests',
+  maintenance_signed: 'maintenance/signed',
+  maintenance_invoice: 'maintenance/invoices',
+  parts_invoice: 'parts/invoices',
 }
 
 function kindLabel(kind: CompletedDocument['kind']) {
@@ -104,18 +101,20 @@ export default function ManagementDocsPage() {
   }, [documents])
 
   const groupedDocuments = useMemo(() => {
-    const map = new Map<string, CompletedDocument[]>()
-    for (const doc of filteredDocuments) {
-      const folder = folderPathFromDoc(doc)
-      if (!map.has(folder)) map.set(folder, [])
-      map.get(folder)?.push(doc)
-    }
     const folderOrder = new Map<string, number>([
       ['maintenance/requests', 1],
       ['maintenance/signed', 2],
       ['maintenance/invoices', 3],
       ['parts/invoices', 4],
     ])
+
+    const map = new Map<string, CompletedDocument[]>()
+    for (const doc of filteredDocuments) {
+      const folder = KIND_FOLDER_MAP[doc.kind] || `fallback/${doc.kind}`
+      if (!map.has(folder)) map.set(folder, [])
+      map.get(folder)?.push(doc)
+    }
+
     return [...map.entries()]
       .sort((a, b) => {
         const aRank = folderOrder.get(a[0]) ?? 999

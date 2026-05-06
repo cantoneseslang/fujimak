@@ -145,6 +145,8 @@ function smtpUserFacingHint(errorMessage: string): string | undefined {
 }
 
 export async function POST(request: NextRequest) {
+  let smtpPassSource: 'env' | 'database' | 'none' = 'none'
+
   try {
     const {
       type,
@@ -166,7 +168,10 @@ export async function POST(request: NextRequest) {
     } = await request.json()
 
     const smtpSettings = await resolveSmtpConfigFromSettings()
-    const smtpPass = asText(process.env.SMTP_PASS) || asText(smtpSettings?.pass)
+    const envPass = asText(process.env.SMTP_PASS)
+    const dbPass = asText(smtpSettings?.pass)
+    smtpPassSource = envPass ? 'env' : dbPass ? 'database' : 'none'
+    const smtpPass = envPass || dbPass
     if (!smtpPass) {
       return NextResponse.json({
         success: true,
@@ -356,7 +361,21 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Failed to send email:', error)
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-    const hint = smtpUserFacingHint(errorMessage)
+    let hint = smtpUserFacingHint(errorMessage)
+    const needsAppPassword =
+      /application-specific password/i.test(errorMessage) ||
+      /invalidsecondfactor/i.test(errorMessage.toLowerCase())
+    if (hint && needsAppPassword) {
+      if (smtpPassSource === 'env') {
+        hint +=
+          '\n\n【重要】いま認証に使っているのは Vercel の環境変数 SMTP_PASS です。Settings でパスワードを変えても、SMTP_PASS が設定されている限りそちらが優先されます。SMTP_PASS の値を「Google が発行したアプリパスワード」だけに差し替え、保存後に Redeploy してください（スペースは削除して16文字をそのまま貼り付け）。'
+      } else if (smtpPassSource === 'database') {
+        hint +=
+          '\n\n【重要】いま認証に使っているのは Settings に保存した SMTP パスワードです。SMTP Password にアプリパスワードを入れて Save してください。なお Vercel に SMTP_PASS が入っているとそちらが優先され、Settings は無視されます。'
+      }
+      hint +=
+        '\n\n会社の Google Workspace で管理者がアプリパスワードを禁止している場合は、Gmail SMTP は使えません。SendGrid / Resend 等への切り替えが必要です。'
+    }
     return NextResponse.json({
       success: false,
       delivered: false,

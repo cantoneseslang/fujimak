@@ -30,6 +30,13 @@ function folderPathFromDoc(doc: CompletedDocument) {
   return raw.slice(0, idx)
 }
 
+function kindLabel(kind: CompletedDocument['kind']) {
+  if (kind === 'maintenance_request') return 'Maintenance Request'
+  if (kind === 'maintenance_signed') return 'Client Signed Report'
+  if (kind === 'maintenance_invoice') return 'Maintenance Invoice'
+  return 'Parts Invoice'
+}
+
 export default function ManagementDocsPage() {
   const [documents, setDocuments] = useState<CompletedDocument[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -250,11 +257,12 @@ export default function ManagementDocsPage() {
                           <div className="flex items-start gap-3">
                             <div className="min-w-0 flex-1">
                               <p className="truncate text-sm font-semibold text-gray-800">
-                                {doc.store_name || doc.store_id || '-'} · {doc.title}
+                                {doc.store_name || doc.store_id || '-'} · {kindLabel(doc.kind)}
                               </p>
                               <p className="mt-0.5 truncate text-xs text-gray-500">
-                                {doc.kind} · {identifier}
+                                {doc.request_id ? `Request ID: ${identifier}` : `Workflow ID: ${identifier}`}
                               </p>
+                              <p className="mt-0.5 truncate text-xs text-gray-500">Subject: {doc.title || '-'}</p>
                               <p className="mt-0.5 truncate text-xs text-gray-500">File: {doc.filename}</p>
                               <p className="mt-0.5 text-xs text-gray-500">
                                 Issued: {issuedAt ? new Date(issuedAt).toLocaleString() : '-'}

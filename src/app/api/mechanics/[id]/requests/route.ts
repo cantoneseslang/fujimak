@@ -30,8 +30,6 @@ const BOARD_REQUEST_COLUMNS = [
   'preferred_date',
 ].join(',')
 
-const OPEN_STATUS = new Set(['in_progress', 'pending'])
-
 export async function GET(_request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params
@@ -58,10 +56,7 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ id
       throw sharedError
     }
 
-    const requests = (Array.isArray(sharedRows) ? sharedRows : []).filter((row) =>
-      OPEN_STATUS.has(asText((row as { status?: unknown }).status))
-    )
-    return NextResponse.json({ requests })
+    return NextResponse.json({ requests: Array.isArray(sharedRows) ? sharedRows : [] })
   } catch (error) {
     return NextResponse.json({ error: asErrorMessage(error) }, { status: 500 })
   }

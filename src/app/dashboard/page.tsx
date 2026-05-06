@@ -111,7 +111,7 @@ export default function DashboardPage() {
 
   const bootShell = (
     <div className="min-h-screen bg-gray-50 pb-24">
-      <Header onRightButtonTripleClick={() => {}} />
+      <Header />
       <main className="flex flex-col items-center justify-center px-4 pt-16 pb-8">
         <Loader2 className="h-10 w-10 animate-spin text-zinc-400" aria-hidden />
         <p className="mt-4 text-sm text-zinc-500">{tCommon('loading')}</p>
@@ -127,7 +127,7 @@ export default function DashboardPage() {
   if (!selectedStore) {
     return (
       <div className="min-h-screen bg-gray-50 pb-24">
-        <Header onRightButtonTripleClick={() => {}} />
+        <Header />
         <main className="flex flex-col items-center px-4 pt-16 pb-8">
           <p className="text-center text-base text-zinc-600">{tCommon('error')}</p>
           <button
@@ -358,9 +358,12 @@ export default function DashboardPage() {
           ) : (
             <div className="space-y-3">
               {recentRequests.map((request) => (
-                <div
+                <Link
                   key={request.id}
-                  className="rounded-lg border border-gray-100 p-3 flex items-center justify-between"
+                  href="/history"
+                  prefetch
+                  className="flex items-center justify-between rounded-lg border border-gray-100 p-3 transition-colors hover:bg-gray-50 active:bg-gray-100"
+                  aria-label={`${t('recentRequests')}: ${request.machineLabel ?? safeItemLabel(request.itemId)}`}
                 >
                   <div>
                     <p className="text-sm font-medium text-gray-800">
@@ -379,7 +382,7 @@ export default function DashboardPage() {
                           ? tHistory('status.completed')
                           : tHistory('status.cancelled')}
                   </span>
-                </div>
+                </Link>
               ))}
             </div>
           )}

@@ -114,9 +114,10 @@ async function resolveRecipients(options: {
     .from('notification_settings')
     .select('enabled')
     .eq('setting_key', settingKey)
-    .single()
+    .maybeSingle()
 
-  if (!setting?.enabled) return []
+  // Row missing (partial migration): treat as enabled. Only skip when explicitly false.
+  if (setting && setting.enabled === false) return []
 
   const { data: emails } = await supabase.from('notification_emails').select('email')
   const settingsRecipients = normalizeRecipients((emails ?? []).map((entry) => entry?.email))
@@ -169,7 +170,12 @@ export async function POST(request: NextRequest) {
     })
 
     if (recipients.length === 0) {
-      return NextResponse.json({ success: true, delivered: false, message: 'No email recipients' })
+      return NextResponse.json({
+        success: true,
+        delivered: false,
+        message:
+          'No email recipients: maintenance notification may be OFF in Admin, or no addresses in notification_emails and SMTP_USER is empty.',
+      })
     }
 
     // 同一イベントの短時間重複送信を抑止（フロント二重発火など）

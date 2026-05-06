@@ -72,7 +72,17 @@ export async function GET(request: NextRequest) {
     const filename =
       requestedFilename ||
       (useInvoice ? asText(record.invoice_pdf_filename) || `invoice-${requestId}.pdf` : `work-report-${requestId}.pdf`)
-    const mode = useInvoice ? 'invoice' : filename.startsWith('signed-report-') ? 'signed' : 'request'
+    const filenameLower = filename.toLowerCase()
+    const mode =
+      requestedMode === 'invoice' ||
+      filenameLower.startsWith('invoice-') ||
+      filenameLower.startsWith('inv-')
+        ? 'invoice'
+        : filenameLower.startsWith('signed-report-')
+          ? 'signed'
+          : useInvoice
+            ? 'invoice'
+            : 'request'
     const archiveCandidates =
       mode === 'invoice'
         ? [maintenanceInvoiceArchivePath(requestId, filename), maintenanceLegacyArchivePath(requestId, filename)]

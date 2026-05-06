@@ -141,17 +141,15 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ id
       }
     }
 
-    /** Shared queue fallback: if no assignment/vendor match, expose open jobs so any mechanic can proceed. */
-    if (requests.length === 0) {
-      const { data: sharedRows, error: sharedError } = await supabase
-        .from('maintenance_requests')
-        .select('*')
-        .in('status', ['in_progress', 'pending'])
-        .order('updated_at', { ascending: false })
-        .limit(200)
-      if (!sharedError && Array.isArray(sharedRows)) {
-        requests = sharedRows
-      }
+    /** Always append shared queue so every mechanic sees current open jobs consistently. */
+    const { data: sharedRows, error: sharedError } = await supabase
+      .from('maintenance_requests')
+      .select('*')
+      .in('status', ['in_progress', 'pending'])
+      .order('updated_at', { ascending: false })
+      .limit(200)
+    if (!sharedError && Array.isArray(sharedRows) && sharedRows.length > 0) {
+      requests = mergeRequestsByUpdatedAt(requests as RequestRow[], sharedRows as RequestRow[]).slice(0, 200)
     }
 
     return NextResponse.json({ requests })

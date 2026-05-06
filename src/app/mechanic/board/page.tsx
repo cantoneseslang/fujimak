@@ -73,6 +73,8 @@ export default function MechanicBoardPage() {
   const loadBoard = useCallback(async (mechanicId: string) => {
     if (!mechanicId) return
     setLoadingBoard(true)
+    setRequests([])
+    setNotifications([])
     try {
       const [requestsRes, notificationsRes] = await Promise.all([
         fetch(`/api/mechanics/${encodeURIComponent(mechanicId)}/requests`, { cache: 'no-store' }),
@@ -240,7 +242,7 @@ export default function MechanicBoardPage() {
           {loadingBoard ? <p className="text-sm text-gray-500">Loading...</p> : null}
           {!loadingBoard && requests.length === 0 ? (
             <p className="text-sm text-gray-500">No assigned jobs.</p>
-          ) : (
+          ) : !loadingBoard ? (
             <div className="space-y-2">
               {requests.map((request) => (
                 <div key={request.id} className="rounded-lg border border-gray-200 p-3">
@@ -263,7 +265,7 @@ export default function MechanicBoardPage() {
                 </div>
               ))}
             </div>
-          )}
+          ) : null}
         </section>
 
         <section className="rounded-xl border border-gray-200 bg-white p-4">

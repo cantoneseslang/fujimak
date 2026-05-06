@@ -39,10 +39,15 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ id
     }
     /** Board intentionally shows shared vendor queue for all mechanics. */
     const supabase = getSupabaseAdmin()
+    const orClause = [
+      'vendor_name.ilike.%mechanicA%',
+      'vendor_name.ilike.%mechanicB%',
+      'vendor_name.ilike.%mechanicC%',
+    ].join(',')
     const { data: sharedRows, error: sharedError } = await supabase
       .from('maintenance_requests')
       .select(BOARD_REQUEST_COLUMNS)
-      .in('vendor_name', ['mechanicA', 'mechanicB', 'mechanicC'])
+      .or(orClause)
       .in('status', ['in_progress', 'pending'])
       .order('updated_at', { ascending: false })
       .limit(200)

@@ -48,15 +48,35 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ id
       .order('updated_at', { ascending: false })
       .limit(200)
 
-    if (sharedError) {
-      const message = asErrorMessage(sharedError)
-      if (/column|schema cache|could not find|relation|does not exist/i.test(message)) {
-        return NextResponse.json({ requests: [] })
+    let rows = Array.isArray(sharedRows) ? sharedRows : []
+    const shouldFallbackToFullRow =
+      !!sharedError ||
+      rows.length === 0
+
+    if (shouldFallbackToFullRow) {
+      const { data: fallbackRows, error: fallbackError } = await supabase
+        .from('maintenance_requests')
+        .select('*')
+        .order('updated_at', { ascending: false })
+        .limit(200)
+      if (!fallbackError && Array.isArray(fallbackRows)) {
+        rows = fallbackRows
+      } else if (sharedError && fallbackError) {
+        const message = asErrorMessage(fallbackError)
+        if (/column|schema cache|could not find|relation|does not exist/i.test(message)) {
+          return NextResponse.json({ requests: [] })
+        }
+        throw fallbackError
+      } else if (sharedError) {
+        const message = asErrorMessage(sharedError)
+        if (/column|schema cache|could not find|relation|does not exist/i.test(message)) {
+          return NextResponse.json({ requests: [] })
+        }
+        throw sharedError
       }
-      throw sharedError
     }
 
-    return NextResponse.json({ requests: Array.isArray(sharedRows) ? sharedRows : [] })
+    return NextResponse.json({ requests: rows })
   } catch (error) {
     return NextResponse.json({ error: asErrorMessage(error) }, { status: 500 })
   }

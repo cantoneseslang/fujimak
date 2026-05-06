@@ -30,9 +30,9 @@ const KIND_FOLDER_MAP: Record<CompletedDocument['kind'], string> = {
 }
 
 const MAINTENANCE_FOLDERS = [
-  { folder: 'maintenance/requests', slug: 'maintenance_request', label: 'Maintenance Request' },
-  { folder: 'maintenance/signed', slug: 'maintenance_signed', label: 'Client Signed Report' },
-  { folder: 'maintenance/invoices', slug: 'maintenance_invoice', label: 'Maintenance Invoice' },
+  { folder: 'maintenance/requests', label: 'Maintenance Request' },
+  { folder: 'maintenance/signed', label: 'Client Signed Report' },
+  { folder: 'maintenance/invoices', label: 'Maintenance Invoice' },
 ] as const
 
 export default function ManagementDocsPage() {
@@ -106,9 +106,9 @@ export default function ManagementDocsPage() {
       map.get(folder)?.push(doc)
     }
 
-    return MAINTENANCE_FOLDERS.map(({ folder, slug, label }) => ({
+    return MAINTENANCE_FOLDERS.map(({ folder, label }) => ({
       folder,
-      heading: `${slug} | ${label}`,
+      heading: label,
       docs: map.get(folder) ?? [],
     }))
   }, [filteredDocuments])

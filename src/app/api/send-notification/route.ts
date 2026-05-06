@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import nodemailer from 'nodemailer'
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin'
 
+/** Gmail SMTP — official App Password steps (not Passkeys); hints/UI link here first */
+const GOOGLE_APP_PASSWORD_GUIDE_URL = 'https://support.google.com/accounts/answer/185833'
+
 // ベストエフォート重複送信防止（同一インスタンス内・短時間）
 const recentIdempotency = new Map<string, number>()
 const IDEMPOTENCY_TTL_MS = 15_000
@@ -133,13 +136,13 @@ function smtpUserFacingHint(errorMessage: string): string | undefined {
     m.includes('application-specific password') ||
     (m.includes('534') && m.includes('invalidsecondfactor'))
   ) {
-    return 'この Gmail は二段階認証が有効です。通常のログインパスワードでは送信できません。パスキー（Passkey）は SMTP には使えません（画面にパスワードの文字列は出ません）。別に「アプリパスワード」が必要です。Google アカウント → セキュリティ → 2 段階認証プロセス → アプリパスワード（メニューに無い場合は画面上部の検索で「アプリ パスワード」と検索）でメール用を新規発行し、表示された英数字だけを SMTP_PASS / Settings の SMTP Password に貼り付け、Vercel 変更後は Redeploy。詳細: https://support.google.com/mail/?p=InvalidSecondFactor'
+    return `【公式・最初にこれ】Google アカウントでアプリパスワードを作成する手順: ${GOOGLE_APP_PASSWORD_GUIDE_URL}\n\n二段階認証がオンのアカウントでは、通常パスワードやパスキー（Passkey）では Gmail SMTP にログインできません。上記の公式ページどおりに発行した英数字だけを SMTP_PASS（Vercel）および Settings の SMTP Password に貼り付け、環境変数を変えたら Redeploy。補足（Gmail のエラー説明）: https://support.google.com/mail/?p=InvalidSecondFactor`
   }
   if (m.includes('534') && (m.includes('webloginrequired') || m.includes('log in with your web browser'))) {
-    return 'Gmail がサーバーからの SMTP ログインを拒否しています（アカウントのセキュリティ確認）。ブラウザで同じ Gmail にログインし、https://accounts.google.com/DisplayUnlockCaptcha でロック解除後に再試行するか、2 段階認証＋アプリパスワードを SMTP に設定してください。本番の運用では SendGrid / Resend などの送信専用サービスが確実です。'
+    return `【公式・最初にこれ】アプリパスワード: ${GOOGLE_APP_PASSWORD_GUIDE_URL}\n\nあわせてブラウザでアカウント確認が必要な場合: https://accounts.google.com/DisplayUnlockCaptcha\n\n本番の確実な送信には SendGrid / Resend などの送信専用サービスも検討してください。`
   }
   if (m.includes('535') && m.includes('badcredentials')) {
-    return 'Gmail がユーザー名・パスワードを拒否しています。Google アカウントのログインパスワードではなく、アプリパスワードを SMTP_PASS に設定してください。'
+    return `【公式・最初にこれ】アプリパスワード: ${GOOGLE_APP_PASSWORD_GUIDE_URL}\n\nログインパスワードを SMTP に入れると拒否されます。アプリパスワードに差し替えてください。`
   }
   return undefined
 }
@@ -177,8 +180,7 @@ export async function POST(request: NextRequest) {
         success: true,
         delivered: false,
         skipped: true,
-        message:
-          'Notification skipped: no SMTP password. Set SMTP_PASS in Vercel (Production), or save Gmail App Password in Settings → SMTP Password and Save.',
+        message: `Notification skipped: no SMTP password. Gmail の場合はまず公式どおりアプリパスワードを作成: ${GOOGLE_APP_PASSWORD_GUIDE_URL} — 作成後、Vercel の SMTP_PASS に設定するか、Settings の SMTP Password に保存してください（Vercel 変更後は Redeploy）。`,
       })
     }
 

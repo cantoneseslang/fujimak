@@ -775,9 +775,24 @@ export default function SettingsPage() {
               <Mail className="w-5 h-5" />
               SMTP Settings
             </h2>
-            <p className="mt-1 text-xs text-gray-500">
-              Configure outgoing mail account for notification delivery (Gmail: use App Password).
-            </p>
+            <div className="mt-2 space-y-2 rounded-lg border border-amber-100 bg-amber-50 p-3 text-xs text-gray-800">
+              <p className="font-semibold text-gray-900">Gmail を使う場合（最初に読んでください）</p>
+              <p>
+                <a
+                  href="https://support.google.com/accounts/answer/185833"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-blue-800 underline break-all"
+                >
+                  Google 公式: アプリパスワードでログインする
+                </a>
+              </p>
+              <p className="text-gray-700">
+                二段階認証が必要です。パスキー（Passkey）や通常のログインパスワードは SMTP に使えません。公式ページどおりに発行したアプリパスワードだけを、下の SMTP Password に貼り付けて Save してください。
+                本番（Vercel）では環境変数 <span className="font-mono text-[11px]">SMTP_PASS</span>{' '}
+                にも同じ値を入れ、変更後は Redeploy が必要です。
+              </p>
+            </div>
           </div>
           <div className="space-y-3 p-4 bg-gray-50 rounded-lg">
             <div>

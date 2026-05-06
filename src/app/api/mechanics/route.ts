@@ -116,7 +116,11 @@ export async function GET(request: NextRequest) {
       }
     }
     const supabase = getSupabaseAdmin()
-    let query = supabase.from('mechanics').select('*').order('created_at', { ascending: false })
+    let query = supabase
+      .from('mechanics')
+      .select('*')
+      .order('created_at', { ascending: true })
+      .order('email', { ascending: true })
     if (!includeInactive) query = query.eq('is_active', true)
     const { data, error } = await query
     if (error) {

@@ -133,7 +133,7 @@ function smtpUserFacingHint(errorMessage: string): string | undefined {
     m.includes('application-specific password') ||
     (m.includes('534') && m.includes('invalidsecondfactor'))
   ) {
-    return 'この Gmail は二段階認証が有効です。通常パスワードでは送信できません。Google アカウント → セキュリティ → 2 段階認証プロセス → アプリパスワード で「メール」用のパスワードを新規発行し、SMTP_PASS（および Settings の SMTP Password）をその値だけに差し替え、Vercel は環境変数変更後に再デプロイしてください。詳細: https://support.google.com/mail/?p=InvalidSecondFactor'
+    return 'この Gmail は二段階認証が有効です。通常のログインパスワードでは送信できません。パスキー（Passkey）は SMTP には使えません（画面にパスワードの文字列は出ません）。別に「アプリパスワード」が必要です。Google アカウント → セキュリティ → 2 段階認証プロセス → アプリパスワード（メニューに無い場合は画面上部の検索で「アプリ パスワード」と検索）でメール用を新規発行し、表示された英数字だけを SMTP_PASS / Settings の SMTP Password に貼り付け、Vercel 変更後は Redeploy。詳細: https://support.google.com/mail/?p=InvalidSecondFactor'
   }
   if (m.includes('534') && (m.includes('webloginrequired') || m.includes('log in with your web browser'))) {
     return 'Gmail がサーバーからの SMTP ログインを拒否しています（アカウントのセキュリティ確認）。ブラウザで同じ Gmail にログインし、https://accounts.google.com/DisplayUnlockCaptcha でロック解除後に再試行するか、2 段階認証＋アプリパスワードを SMTP に設定してください。本番の運用では SendGrid / Resend などの送信専用サービスが確実です。'

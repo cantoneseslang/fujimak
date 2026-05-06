@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import Header from '@/components/Header'
@@ -50,6 +50,7 @@ export default function MechanicBoardPage() {
   const [requests, setRequests] = useState<MaintenanceRequest[]>([])
   const [notifications, setNotifications] = useState<MechanicNotification[]>([])
   const [loadingBoard, setLoadingBoard] = useState(false)
+  const didRestoreMechanicFromStorage = useRef(false)
 
   const selectedMechanic = useMemo(
     () => mechanics.find((mechanic) => mechanic.id === selectedMechanicId) ?? null,
@@ -59,7 +60,7 @@ export default function MechanicBoardPage() {
   const loadMechanics = useCallback(async () => {
     setMechanicsError(null)
     try {
-      const res = await fetch('/api/mechanics', { cache: 'no-store' })
+      const res = await fetch('/api/mechanics?seedDefault=1', { cache: 'no-store' })
       const json = (await res.json()) as { mechanics?: Mechanic[]; error?: string }
       if (!res.ok) throw new Error(json.error || 'Failed to load mechanics')
       setMechanics(Array.isArray(json.mechanics) ? json.mechanics : [])
@@ -97,16 +98,33 @@ export default function MechanicBoardPage() {
 
   useEffect(() => {
     void loadMechanics()
+  }, [loadMechanics])
+
+  /** Restore saved mechanic only after the server list is loaded — stale UUIDs cause empty boards forever */
+  useEffect(() => {
+    if (mechanics.length === 0 || didRestoreMechanicFromStorage.current) return
+    didRestoreMechanicFromStorage.current = true
     const raw = localStorage.getItem(MECHANIC_PROFILE_KEY)
     if (!raw) return
     try {
       const parsed = JSON.parse(raw) as { mechanicId?: unknown }
       const savedId = asText(parsed.mechanicId)
-      if (savedId) setSelectedMechanicId(savedId)
+      if (!savedId) return
+      const exists = mechanics.some((m) => m.id === savedId)
+      if (exists) {
+        setSelectedMechanicId(savedId)
+      } else {
+        localStorage.removeItem(MECHANIC_PROFILE_KEY)
+        setSelectedMechanicId('')
+        setLoginError(
+          'Saved mechanic no longer matches the server list. Select your mechanic again and tap Enter.'
+        )
+      }
     } catch {
-      // ignore broken local storage
+      localStorage.removeItem(MECHANIC_PROFILE_KEY)
+      setSelectedMechanicId('')
     }
-  }, [loadMechanics])
+  }, [mechanics])
 
   useEffect(() => {
     if (!selectedMechanicId) return

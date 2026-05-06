@@ -399,7 +399,15 @@
     "savePartsRecipients": "Save Parts Recipients",
     "logout": "Logout",
     "version": "Version",
-    "profile": "Profile"
+    "profile": "Profile",
+    "smtpSendTest": "Send test",
+    "smtpTestToLabel": "Test recipient (defaults to SMTP User if empty)",
+    "smtpTestToHint": "Check inbox and spam for the test message.",
+    "smtpTesting": "Sending test…",
+    "smtpTestTechnicalSummary": "Technical detail (raw server message)",
+    "smtpTestUnknownTitle": "Error",
+    "smtpTestUnknownSummary": "Could not parse the server response.",
+    "smtpTestSuccessFallback": "Test email sent successfully."
   },
   "areas": {
     "all-area": "All Areas",

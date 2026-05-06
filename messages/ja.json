@@ -399,7 +399,15 @@
     "savePartsRecipients": "部品発注送信先を保存",
     "logout": "ログアウト",
     "version": "バージョン",
-    "profile": "プロフィール"
+    "profile": "プロフィール",
+    "smtpSendTest": "送信テスト",
+    "smtpTestToLabel": "テスト送信先（空欄なら SMTP User）",
+    "smtpTestToHint": "受信箱と迷惑メールを確認してください。",
+    "smtpTesting": "テスト送信中…",
+    "smtpTestTechnicalSummary": "技術的な詳細（サーバーからの生メッセージ）",
+    "smtpTestUnknownTitle": "エラー",
+    "smtpTestUnknownSummary": "サーバーからの応答を正しく解釈できませんでした。",
+    "smtpTestSuccessFallback": "テスト送信に成功しました。"
   },
   "areas": {
     "all-area": "全域",

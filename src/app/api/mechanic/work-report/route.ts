@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import nodemailer from 'nodemailer'
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin'
 import { resolveSmtpConfigFromSettings } from '@/lib/smtpNotificationSettings'
+import { explainSmtpFailure } from '@/lib/smtpExplainError'
 import { buildMechanicWorkReportPdf } from '@/lib/mechanicWorkReportPdf'
 import type { MaintenanceRequestRecord } from '@/lib/maintenance'
 import { buildMaintenanceReportFormState, serializeMaintenanceReportForm } from '@/lib/maintenanceReportForm'
@@ -251,11 +252,15 @@ export async function POST(request: NextRequest) {
           })
           emailSent = true
         } catch (error) {
-          emailError = asErrorMessage(error)
-          if (/535|authentication failed/i.test(emailError.toLowerCase())) {
-            emailError +=
-              ' SMTP auth failed: use an App Password for Gmail, matching SMTP_USER and SMTP_PASS. On Vercel, SMTP_PASS overrides Settings until cleared.'
-          }
+          const raw = asErrorMessage(error)
+          const ex = explainSmtpFailure(raw, 'ja')
+          emailError = [
+            ex.title,
+            ex.summary,
+            ...ex.actions.map((a) => `・${a}`),
+            '',
+            `技術詳細: ${ex.technical}`,
+          ].join('\n')
         }
       }
     } else if (shouldSend) {

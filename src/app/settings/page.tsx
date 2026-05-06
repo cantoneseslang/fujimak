@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useEffect } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
-import { Globe, LogOut, Mail, Plus, Trash2, Save } from 'lucide-react'
+import { Globe, LogOut, Mail, Plus, Trash2, Save, Send } from 'lucide-react'
 import Header from '@/components/Header'
 import BottomNav from '@/components/BottomNav'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
@@ -39,6 +39,17 @@ type SmtpSettings = {
   from: string
 }
 
+type SmtpTestExplanation = {
+  title: string
+  summary: string
+  actions: string[]
+  technical: string
+}
+
+type SmtpTestFeedback =
+  | { type: 'success'; message: string; recipient?: string }
+  | { type: 'error'; explanation: SmtpTestExplanation; step?: string }
+
 export default function SettingsPage() {
   const [vendors, setVendors] = useState<Vendor[]>(DEFAULT_VENDORS)
   const [mechanics, setMechanics] = useState<MechanicSetting[]>([])
@@ -53,6 +64,9 @@ export default function SettingsPage() {
   })
   const [isSaving, setIsSaving] = useState(false)
   const [saveFeedback, setSaveFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [smtpTestTo, setSmtpTestTo] = useState('')
+  const [isSmtpTesting, setIsSmtpTesting] = useState(false)
+  const [smtpTestFeedback, setSmtpTestFeedback] = useState<SmtpTestFeedback | null>(null)
   const t = useTranslations('settings')
   const nextIntlLocale = useLocale()
   const uiLocale: Locale = locales.includes(nextIntlLocale as Locale)
@@ -375,7 +389,68 @@ export default function SettingsPage() {
 
   const updateSmtpSetting = <K extends keyof SmtpSettings>(key: K, value: SmtpSettings[K]) => {
     setSaveFeedback(null)
+    setSmtpTestFeedback(null)
     setSmtpSettings((prev) => ({ ...prev, [key]: value }))
+  }
+
+  const runSmtpTest = async () => {
+    setSmtpTestFeedback(null)
+    setIsSmtpTesting(true)
+    try {
+      const res = await fetch('/api/settings/smtp/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          smtp: {
+            host: smtpSettings.host.trim(),
+            port: smtpSettings.port.trim() || '465',
+            secure: smtpSettings.secure !== false,
+            user: smtpSettings.user.trim(),
+            pass: smtpSettings.pass.trim(),
+            from: smtpSettings.from.trim(),
+          },
+          mergeSavedPassword: true,
+          testTo: smtpTestTo.trim() || undefined,
+          locale: uiLocale,
+        }),
+      })
+      const json = (await res.json()) as {
+        ok?: boolean
+        explanation?: SmtpTestExplanation
+        step?: string
+        message?: string
+        recipient?: string
+      }
+      if (!res.ok || !json.ok) {
+        const explanation =
+          json.explanation ??
+          ({
+            title: t('smtpTestUnknownTitle'),
+            summary: t('smtpTestUnknownSummary'),
+            actions: [],
+            technical: typeof json === 'object' ? JSON.stringify(json) : 'unknown',
+          } satisfies SmtpTestExplanation)
+        setSmtpTestFeedback({ type: 'error', explanation, step: json.step })
+        return
+      }
+      setSmtpTestFeedback({
+        type: 'success',
+        message: json.message ?? t('smtpTestSuccessFallback'),
+        recipient: json.recipient,
+      })
+    } catch {
+      setSmtpTestFeedback({
+        type: 'error',
+        explanation: {
+          title: t('smtpTestUnknownTitle'),
+          summary: t('smtpTestUnknownSummary'),
+          actions: [],
+          technical: 'Network error',
+        },
+      })
+    } finally {
+      setIsSmtpTesting(false)
+    }
   }
 
   const saveAllSettings = async () => {
@@ -927,24 +1002,98 @@ export default function SettingsPage() {
                 placeholder="Fujimak Maintenance <youraccount@gmail.com>"
               />
             </div>
+            <div className="rounded-lg border border-dashed border-zinc-300 bg-white p-3">
+              <label className="block text-sm font-medium text-gray-700">{t('smtpTestToLabel')}</label>
+              <input
+                type="email"
+                value={smtpTestTo}
+                onChange={(e) => setSmtpTestTo(e.target.value)}
+                className="w-full mt-2 px-4 py-3 bg-white border border-gray-200 rounded-lg text-base focus:ring-2 focus:ring-zinc-900 focus:border-transparent"
+                placeholder={smtpSettings.user.trim() || 'recipient@example.com'}
+              />
+              <p className="mt-1 text-xs text-gray-500">{t('smtpTestToHint')}</p>
+            </div>
           </div>
         </section>
 
-        <button
-          onClick={saveAllSettings}
-          disabled={isSaving || hasDuplicateVendorEmails || hasDuplicateMechanicEmails}
-          className="py-4 bg-zinc-900 text-white rounded-xl font-medium text-lg flex items-center justify-center gap-2"
-          style={{ width: '288px', marginLeft: 'auto', marginRight: 'auto' }}
-        >
-          {isSaving ? (
-            <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
-          ) : (
-            <>
-              <Save className="w-6 h-6" />
-              {t('save')}
-            </>
-          )}
-        </button>
+        <div className="flex w-full max-w-xl mx-auto flex-col gap-3 px-2 sm:flex-row sm:justify-center">
+          <button
+            type="button"
+            onClick={saveAllSettings}
+            disabled={
+              isSaving ||
+              isSmtpTesting ||
+              hasDuplicateVendorEmails ||
+              hasDuplicateMechanicEmails
+            }
+            className="flex flex-1 min-h-[52px] items-center justify-center gap-2 rounded-xl bg-zinc-900 py-4 text-lg font-medium text-white disabled:opacity-50"
+          >
+            {isSaving ? (
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-white border-t-transparent" />
+            ) : (
+              <>
+                <Save className="h-6 w-6" />
+                {t('save')}
+              </>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => void runSmtpTest()}
+            disabled={
+              isSmtpTesting ||
+              isSaving ||
+              hasDuplicateVendorEmails ||
+              hasDuplicateMechanicEmails ||
+              !smtpSettings.host.trim() ||
+              !smtpSettings.user.trim()
+            }
+            className="flex flex-1 min-h-[52px] items-center justify-center gap-2 rounded-xl border-2 border-zinc-900 bg-white py-4 text-lg font-medium text-zinc-900 disabled:opacity-50"
+          >
+            {isSmtpTesting ? (
+              <>
+                <div className="h-6 w-6 animate-spin rounded-full border-2 border-zinc-900 border-t-transparent" />
+                <span>{t('smtpTesting')}</span>
+              </>
+            ) : (
+              <>
+                <Send className="h-6 w-6" />
+                {t('smtpSendTest')}
+              </>
+            )}
+          </button>
+        </div>
+        {smtpTestFeedback?.type === 'success' ? (
+          <div className="mx-auto mt-3 max-w-xl rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-900">
+            <p className="font-semibold">{smtpTestFeedback.message}</p>
+            {smtpTestFeedback.recipient ? (
+              <p className="mt-1 text-xs text-emerald-800">{smtpTestFeedback.recipient}</p>
+            ) : null}
+          </div>
+        ) : null}
+        {smtpTestFeedback?.type === 'error' ? (
+          <div className="mx-auto mt-3 max-w-xl rounded-lg border border-red-200 bg-red-50 px-3 py-3 text-sm text-red-950">
+            <p className="font-semibold text-red-900">{smtpTestFeedback.explanation.title}</p>
+            {smtpTestFeedback.step ? (
+              <p className="mt-1 text-xs font-medium uppercase tracking-wide text-red-700">
+                step: {smtpTestFeedback.step}
+              </p>
+            ) : null}
+            <p className="mt-2 text-red-900">{smtpTestFeedback.explanation.summary}</p>
+            {smtpTestFeedback.explanation.actions.length > 0 ? (
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-red-900">
+                {smtpTestFeedback.explanation.actions.map((line, idx) => (
+                  <li key={idx}>{line}</li>
+                ))}
+              </ul>
+            ) : null}
+            <details className="mt-3 text-xs text-red-800">
+              <summary className="cursor-pointer font-medium">{t('smtpTestTechnicalSummary')}</summary>
+              <pre className="mt-2 whitespace-pre-wrap break-all font-mono">{smtpTestFeedback.explanation.technical}</pre>
+            </details>
+          </div>
+        ) : null}
+
         {saveFeedback ? (
           <p
             className={`mt-3 rounded-lg px-3 py-2 text-sm ${

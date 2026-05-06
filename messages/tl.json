@@ -399,7 +399,15 @@
     "savePartsRecipients": "I-save ang Mga Recipient ng Parts Order",
     "logout": "Mag-logout",
     "version": "Bersyon",
-    "profile": "Profile"
+    "profile": "Profile",
+    "smtpSendTest": "Test na ipadala",
+    "smtpTestToLabel": "Test recipient (kung walang laman → SMTP User)",
+    "smtpTestToHint": "Tingnan ang inbox at spam folder.",
+    "smtpTesting": "Nagpapadala ng test…",
+    "smtpTestTechnicalSummary": "Technical detail (mensahe galing server)",
+    "smtpTestUnknownTitle": "Error",
+    "smtpTestUnknownSummary": "Hindi ma-parse ang tugon ng server.",
+    "smtpTestSuccessFallback": "Matagumpay na napadala ang test email."
   },
   "areas": {
     "all-area": "Lahat ng Lugar",

@@ -223,12 +223,12 @@ export default function ManagementDocsPage() {
           <div className="px-4 py-3 border-b border-gray-100 bg-white">
             <div className="flex items-center gap-2">
               <label className="relative block flex-1">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-gray-400" />
                 <input
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                   placeholder="Search by store / request ID / order no / filename"
-                  className="w-full rounded-lg border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm text-gray-800"
+                  className="w-full rounded-lg border border-gray-200 bg-white py-2 pl-11 pr-3 text-sm text-gray-800"
                 />
               </label>
               <button

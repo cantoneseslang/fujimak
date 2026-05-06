@@ -4,6 +4,7 @@ import { getSupabaseAdmin } from '@/lib/supabaseAdmin'
 import { parsePartsOrderDraftFromBody } from '@/lib/partsOrderApi'
 import { readPartsImageDataUri } from '@/lib/partsImagePaths'
 import { buildPartsOrderPdf, formatCurrency } from '@/lib/partsOrderPdf'
+import { fetchNotificationRecipientEmails } from '@/lib/notificationEmailsCompat'
 import { calculateOrderTotals } from '@/lib/partsOrder'
 
 const recentOrders = new Map<string, number>()
@@ -46,17 +47,7 @@ const getRecipients = async () => {
   )
   if (partsRecipients.length > 0) return partsRecipients
 
-  const { data: emails } = await supabase
-    .from('notification_emails')
-    .select('email')
-    .eq('is_active', true)
-  const dbRecipients = Array.from(
-    new Set(
-      (emails ?? [])
-        .map((entry) => (typeof entry?.email === 'string' ? entry.email.trim().toLowerCase() : ''))
-        .filter((email) => email.length > 0)
-    )
-  )
+  const dbRecipients = await fetchNotificationRecipientEmails(supabase)
   if (dbRecipients.length > 0) return dbRecipients
 
   const fallback = asText(process.env.SMTP_USER || 'info@lifesupporthk.com').toLowerCase()

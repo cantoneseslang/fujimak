@@ -1,3 +1,4 @@
+import { fetchNotificationRecipientEmails } from '@/lib/notificationEmailsCompat'
 import { NextRequest, NextResponse } from 'next/server'
 import nodemailer from 'nodemailer'
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin'
@@ -122,11 +123,7 @@ async function resolveRecipients(options: {
   // Row missing (partial migration): treat as enabled. Only skip when explicitly false.
   if (setting && setting.enabled === false) return []
 
-  const { data: emails } = await supabase
-    .from('notification_emails')
-    .select('email')
-    .eq('is_active', true)
-  const settingsRecipients = normalizeRecipients((emails ?? []).map((entry) => entry?.email))
+  const settingsRecipients = normalizeRecipients(await fetchNotificationRecipientEmails(supabase))
   if (settingsRecipients.length > 0) return settingsRecipients
 
   const fallback = asText(process.env.SMTP_USER || 'info@lifesupporthk.com').toLowerCase()

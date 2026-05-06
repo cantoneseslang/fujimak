@@ -119,23 +119,44 @@ export default function SettingsPage() {
             phone?: string | null
             is_active?: boolean
           }>
+          vendorProfileColumnsUnavailable?: boolean
         }
         const data = json.vendors ?? []
 
         if (data.length > 0) {
           loadedVendorsFromServer = true
-          setVendors(
-            data.map((entry, index) => ({
-              id: entry.id,
-              name:
-                typeof entry.display_name === 'string' && entry.display_name.trim().length > 0
-                  ? entry.display_name.trim()
-                  : `Vendor ${index + 1}`,
-              email: (entry.email || '').trim().toLowerCase(),
-              phone: typeof entry.phone === 'string' ? entry.phone : '',
-              is_active: entry.is_active !== false,
-            }))
-          )
+          let next: Vendor[] = data.map((entry, index) => ({
+            id: entry.id,
+            name:
+              typeof entry.display_name === 'string' && entry.display_name.trim().length > 0
+                ? entry.display_name.trim()
+                : `Vendor ${index + 1}`,
+            email: (entry.email || '').trim().toLowerCase(),
+            phone: typeof entry.phone === 'string' ? entry.phone : '',
+            is_active: entry.is_active !== false,
+          }))
+          if (json.vendorProfileColumnsUnavailable) {
+            try {
+              const raw = localStorage.getItem('vendors')
+              if (raw) {
+                const local = JSON.parse(raw) as Vendor[]
+                const byEmail = new Map(local.map((v) => [normalizeEmail(v.email), v]))
+                next = next.map((row) => {
+                  const hit = byEmail.get(row.email)
+                  if (!hit) return row
+                  return {
+                    ...row,
+                    name: hit.name?.trim() || row.name,
+                    phone: typeof hit.phone === 'string' ? hit.phone : row.phone,
+                    is_active: hit.is_active,
+                  }
+                })
+              }
+            } catch {
+              // ignore corrupt local cache
+            }
+          }
+          setVendors(next)
         }
       } catch (error) {
         console.error('Failed to load vendors from Supabase:', error)
@@ -396,9 +417,12 @@ export default function SettingsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ vendors: vendorsPayload }),
       })
+      const vendorJson = (await vendorResponse.json().catch(() => ({}))) as {
+        error?: string
+        vendorProfilePersistSkipped?: boolean
+      }
       if (!vendorResponse.ok) {
-        const json = (await vendorResponse.json().catch(() => ({}))) as { error?: string }
-        throw new Error(json.error || `Failed to save vendors (${vendorResponse.status})`)
+        throw new Error(vendorJson.error || `Failed to save vendors (${vendorResponse.status})`)
       }
 
       const reloadVendorsRes = await fetch('/api/settings/vendors', { cache: 'no-store' })
@@ -411,8 +435,12 @@ export default function SettingsPage() {
             phone?: string | null
             is_active?: boolean
           }>
+          vendorProfileColumnsUnavailable?: boolean
         }
         const vRows = reloadJson.vendors ?? []
+        const profileSkipped =
+          vendorJson.vendorProfilePersistSkipped === true ||
+          reloadJson.vendorProfileColumnsUnavailable === true
         const remapped = vRows.map((entry, index) => ({
           id: entry.id,
           name:
@@ -423,8 +451,21 @@ export default function SettingsPage() {
           phone: typeof entry.phone === 'string' ? entry.phone : '',
           is_active: entry.is_active !== false,
         }))
-        setVendors(remapped)
-        localStorage.setItem('vendors', JSON.stringify(remapped))
+        const merged = profileSkipped
+          ? remapped.map((row) => {
+              const hit = cleaned.find((c) => normalizeEmail(c.email) === row.email)
+              return hit
+                ? {
+                    ...row,
+                    name: hit.name,
+                    phone: hit.phone,
+                    is_active: hit.is_active,
+                  }
+                : row
+            })
+          : remapped
+        setVendors(merged)
+        localStorage.setItem('vendors', JSON.stringify(merged))
       }
 
       const normalizedPartsRecipientEmail = normalizeEmail(partsOrderRecipientEmail)

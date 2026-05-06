@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin'
+import { isNotificationEmailsSchemaLimitedError } from '@/lib/notificationEmailsCompat'
+
+const ZERO_UUID = '00000000-0000-0000-0000-000000000000'
 
 function asErrorMessage(error: unknown) {
   if (error instanceof Error) return error.message
@@ -61,17 +64,71 @@ function normalizeVendorsPayload(raw: unknown): VendorPayload[] | null {
   return out
 }
 
+async function legacyReplaceEmailsEmailOnly(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  emailsOrdered: string[]
+) {
+  const { error: deleteError } = await supabase
+    .from('notification_emails')
+    .delete()
+    .neq('id', ZERO_UUID)
+  if (deleteError) throw deleteError
+  if (emailsOrdered.length === 0) return
+
+  const extendedInsert = await supabase
+    .from('notification_emails')
+    .insert(emailsOrdered.map((email, index) => ({ email, sort_order: index, is_active: true })))
+  if (!extendedInsert.error) return
+
+  const msg = asErrorMessage(extendedInsert.error)
+  if (!isNotificationEmailsSchemaLimitedError(msg)) throw extendedInsert.error
+
+  const { error: minimalIns } = await supabase
+    .from('notification_emails')
+    .insert(emailsOrdered.map((email) => ({ email })))
+  if (minimalIns) throw minimalIns
+}
+
 export async function GET() {
   try {
     const supabase = getSupabaseAdmin()
-    const { data, error } = await supabase
+    const extended = await supabase
       .from('notification_emails')
       .select('id,email,display_name,phone,is_active,sort_order')
       .order('sort_order', { ascending: true })
       .order('created_at', { ascending: true })
 
-    if (error) throw error
-    return NextResponse.json({ vendors: data ?? [] })
+    if (!extended.error) {
+      return NextResponse.json({ vendors: extended.data ?? [] })
+    }
+
+    const extMsg = asErrorMessage(extended.error)
+    if (!isNotificationEmailsSchemaLimitedError(extMsg)) {
+      return NextResponse.json({ error: extMsg }, { status: 500 })
+    }
+
+    const basic = await supabase
+      .from('notification_emails')
+      .select('id,email')
+      .order('created_at', { ascending: true })
+
+    if (basic.error) {
+      return NextResponse.json({ error: asErrorMessage(basic.error) }, { status: 500 })
+    }
+
+    const vendors = (basic.data ?? []).map((r, i) => ({
+      id: r.id,
+      email: r.email,
+      display_name: null as string | null,
+      phone: '',
+      is_active: true,
+      sort_order: i,
+    }))
+
+    return NextResponse.json({
+      vendors,
+      vendorProfileColumnsUnavailable: true,
+    })
   } catch (error) {
     return NextResponse.json({ error: asErrorMessage(error) }, { status: 500 })
   }
@@ -85,23 +142,9 @@ export async function PUT(request: NextRequest) {
 
     if (vendorsPayload !== null) {
       if (vendorsPayload.length === 0) {
-        const { error: clearError } = await supabase
-          .from('notification_emails')
-          .delete()
-          .neq('id', '00000000-0000-0000-0000-000000000000')
+        const { error: clearError } = await supabase.from('notification_emails').delete().neq('id', ZERO_UUID)
         if (clearError) throw clearError
         return NextResponse.json({ success: true, count: 0 })
-      }
-
-      const keep = new Set(vendorsPayload.map((v) => v.email))
-      const { data: existingRows, error: selErr } = await supabase.from('notification_emails').select('email')
-      if (selErr) throw selErr
-      const orphans = (existingRows ?? [])
-        .map((r) => (typeof r.email === 'string' ? r.email : ''))
-        .filter((e) => e.length > 0 && !keep.has(e))
-      if (orphans.length > 0) {
-        const { error: delErr } = await supabase.from('notification_emails').delete().in('email', orphans)
-        if (delErr) throw delErr
       }
 
       const batchRows = vendorsPayload.map((v, i) => ({
@@ -114,9 +157,25 @@ export async function PUT(request: NextRequest) {
       const { error: batchErr } = await supabase
         .from('notification_emails')
         .upsert(batchRows, { onConflict: 'email' })
-      if (batchErr) throw batchErr
 
-      return NextResponse.json({ success: true, count: vendorsPayload.length })
+      if (!batchErr) {
+        return NextResponse.json({ success: true, count: vendorsPayload.length })
+      }
+
+      const batchMsg = asErrorMessage(batchErr)
+      if (!isNotificationEmailsSchemaLimitedError(batchMsg)) {
+        return NextResponse.json({ error: batchMsg }, { status: 500 })
+      }
+
+      await legacyReplaceEmailsEmailOnly(
+        supabase,
+        vendorsPayload.map((v) => v.email)
+      )
+      return NextResponse.json({
+        success: true,
+        count: vendorsPayload.length,
+        vendorProfilePersistSkipped: true,
+      })
     }
 
     const emails = normalizeEmails(body?.emails)
@@ -124,15 +183,10 @@ export async function PUT(request: NextRequest) {
     const { error: deleteError } = await supabase
       .from('notification_emails')
       .delete()
-      .neq('id', '00000000-0000-0000-0000-000000000000')
+      .neq('id', ZERO_UUID)
     if (deleteError) throw deleteError
 
-    if (emails.length > 0) {
-      const { error: insertError } = await supabase
-        .from('notification_emails')
-        .insert(emails.map((email, index) => ({ email, sort_order: index, is_active: true })))
-      if (insertError) throw insertError
-    }
+    await legacyReplaceEmailsEmailOnly(supabase, emails)
 
     return NextResponse.json({ success: true, count: emails.length })
   } catch (error) {
